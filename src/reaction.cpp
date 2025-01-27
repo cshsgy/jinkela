@@ -5,7 +5,7 @@
 #include <fvm/util/vectorize.hpp>
 #include "reaction.hpp"
 
-namespace canoe {
+namespace kintera {
 
 bool starts_with(const std::string& s, const std::string& prefix) {
   return s.compare(0, prefix.size(), prefix) == 0;
@@ -104,4 +104,4 @@ std::string to_string(Composition const& p) {
   return result.str();
 }
 
-}  // namespace canoe
+}  // namespace kintera
