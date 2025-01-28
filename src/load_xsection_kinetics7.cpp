@@ -1,32 +1,32 @@
+// C/C++
 #include <cmath>
 #include <cstdio>
 
+// torch
+#include <torch/torch.h>
+
+// kintera
 #include "cantera/base/stringUtils.h"
 #include "cantera/kinetics/Reaction.h"
 #include "cantera/kinetics/Photolysis.h"
 
-namespace Cantera
+namespace kintera
 {
 
-pair<vector<double>, vector<double>> 
-load_xsection_kinetics7(vector<string> const& files, vector<Composition> const& branches)
+std::pair<torch::Tensor, torch::Tensor>
+load_xsection_kinetics7(std::vector<std::string> const& files,
+                        std::vector<Composition> const& branches)
 {
-  if (files.size() != 1) {
-    throw CanteraError("load_xsection_kinetics7",
-                       "Only one file can be loaded for Kinetics7 format.");
-  }
+  TORCH_CHECK(files.size() == 1, "Only one file can be loaded for Kinetics7 format.");
 
   auto const& filename = files[0];
 
   FILE* file = fopen(filename.c_str(), "r");
 
-  if (!file) {
-    throw CanteraError("load_xsection_kinetics7",
-                       "Could not open file '{}'", filename);
-  }
+  TORCH_CHECK(file, "Could not open file: ", filename);
 
-  vector<double> wavelength;
-  vector<double> xsection;
+  std::vector<double> wavelength;
+  std::vector<double> xsection;
 
   // first cross section data is always the photoabsorption cross section (no dissociation)
   int nbranch = branches.size();
@@ -50,11 +50,7 @@ load_xsection_kinetics7(vector<string> const& files, vector<Composition> const& 
     min_is = std::min(min_is, is);
     max_ie = std::max(max_ie, ie);
 
-    if (num != 5) {
-      throw CanteraError("PhotolysisBase::loadCrossSectionKinetics7",
-                         "Header format from file '{}' is wrong.", filename);
-    }
-
+    TORCH_CHECK(num == 5, "Header format from file '", filename, "' is wrong.");
     // initialize wavelength and xsection for the first time
     if (wavelength.size() == 0) {
       wavelength.resize(nwave);
@@ -81,10 +77,7 @@ load_xsection_kinetics7(vector<string> const& files, vector<Composition> const& 
         for (int j = 0; j < ncols; j++) {
           float wave, cross;
           int num = sscanf(line + 17*j, "%7f%10f", &wave, &cross);
-          if (num != 2) {
-            throw CanteraError("PhotolysisBase::loadCrossSectionKinetics7",
-                               "Cross-section format from file '{}' is wrong.", filename);
-          }
+          TORCH_CHECK(num == 2, "Cross-section format from file '", filename, "' is wrong.");
           int b = it - branches.begin();
           int k = i * ncols + j;
 
@@ -99,11 +92,11 @@ load_xsection_kinetics7(vector<string> const& files, vector<Composition> const& 
   }
 
   // remove unused wavelength and xsection
-  wavelength = vector<double>(wavelength.begin() + min_is - 1,
-                              wavelength.begin() + max_ie);
+  wavelength = std::vector<double>(wavelength.begin() + min_is - 1,
+                                   wavelength.begin() + max_ie);
 
-  xsection = vector<double>(xsection.begin() + (min_is - 1) * nbranch,
-                            xsection.begin() + max_ie * nbranch);
+  xsection = std::vector<double>(xsection.begin() + (min_is - 1) * nbranch,
+                                 xsection.begin() + max_ie * nbranch);
 
   // A -> A is the total cross section in kinetics7 format
   // need to subtract the other branches
@@ -127,7 +120,7 @@ load_xsection_kinetics7(vector<string> const& files, vector<Composition> const& 
     printf("\n");
   }*/
 
-  return {std::move(wavelength), std::move(xsection)};
+  return {torch::Tensor(wavelength), torch::Tensor(xsection)};
 }
 
-} // namespace Cantera
+} // namespace kintera

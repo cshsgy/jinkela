@@ -1,32 +1,31 @@
+// C/C++
 #include <cmath>
 #include <cstdio>
 #include <cstring>
 
-#include "cantera/kinetics/Reaction.h"
-#include "cantera/kinetics/Photolysis.h"
+// torch
+#include <torch/torch.h>
 
-namespace Cantera
+// kintera
+#include "reaction.hpp"
+
+namespace kintera
 {
 
-pair<vector<double>, vector<double>> 
-load_xsection_vulcan(vector<string> const& files, vector<Composition> const& branches)
+std::pair<torch::Tensor, torch::Tensor> 
+load_xsection_vulcan(std::vector<std::string> const& files,
+                     std::vector<Composition> const& branches)
 {
-  if (files.size() != 2) {
-    throw CanteraError("load_xsection_Vulcan",
-                       "Only two files can be loaded for Vulcan format.");
-  }
+  TORCH_CHECK(files.size() == 2, "Only two files can be loaded for Vulcan format.");
 
   // read cross sections
   FILE* file1 = fopen(files[0].c_str(), "r");
 
-  if (!file1) {
-    throw CanteraError("load_xsection_vulcan",
-                       "Could not open file: " + files[0]);
-  }
+  TORCH_CHECK(file1, "Could not open file: ", files[0]);
 
-  vector<double> wavelength;
-  vector<double> xsection;
-  vector<double> xdiss;
+  std::vector<double> wavelength;
+  std::vector<double> xsection;
+  std::vector<double> xdiss;
 
   // first branch is the photoabsorption cross section (no dissociation)
   int nbranch = branches.size();
@@ -42,10 +41,7 @@ load_xsection_vulcan(vector<string> const& files, vector<Composition> const& bra
   while ((read = getline(&line, &len, file1)) != -1) {
     double wave, pabs, pdis, pion;
     int num = sscanf(line, "%lf, %lf, %lf, %lf", &wave, &pabs, &pdis, &pion);
-    if (num != 4) {
-      throw CanteraError("load_xsection_vulcan",
-                         "Could not read line: " + string(line));
-    }
+    TORCH_CHECK(num == 4, "Could not read line: ", line);
 
     // nm -> m
     wavelength.push_back(wave * 1.e-9);
@@ -63,11 +59,7 @@ load_xsection_vulcan(vector<string> const& files, vector<Composition> const& bra
 
   // read branch ratios
   FILE* file2 = fopen(files[1].c_str(), "r");
-
-  if (!file2) {
-    throw CanteraError("load_xsection_vulcan",
-                       "Could not open file: " + files[1]);
-  }
+  TORCH_CHECK(file2, "Could not open file: ", files[1]);
 
   std::vector<double> bwave;
   std::vector<double> bratio;
@@ -84,10 +76,7 @@ load_xsection_vulcan(vector<string> const& files, vector<Composition> const& bra
 
     for (int i = 1; i < nbranch; ++i) {
       token = strtok(NULL, ",");
-      if (!token) {
-        throw CanteraError("load_xsection_vulcan",
-                           "Error parsing line: " + string(line));
-      }
+      TORCH_CHECK(token, "Error parsing line: ", line);
       bratio.push_back(atof(token));
     }
   }
@@ -106,7 +95,7 @@ load_xsection_vulcan(vector<string> const& files, vector<Composition> const& bra
     }
   }
 
-  return {std::move(wavelength), std::move(xsection)};
+  return {torch::Tensor(wavelength), torch::Tensor(xsection)};
 }
 
-} // namespace Cantera
+} // namespace kintera
