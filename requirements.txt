@@ -1,0 +1,5 @@
+numpy
+pre-commit
+torch
+twine
+wheel
