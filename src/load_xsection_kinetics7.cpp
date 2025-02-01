@@ -120,7 +120,7 @@ load_xsection_kinetics7(std::vector<std::string> const& files,
     printf("\n");
   }*/
 
-  return {torch::Tensor(wavelength), torch::Tensor(xsection)};
+  return {torch::tensor(wavelength), torch::tensor(xsection)};
 }
 
 } // namespace kintera

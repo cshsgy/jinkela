@@ -17,7 +17,7 @@ class PhotochemTitan: public testing::Test {
     kin = newKinetics({phase}, "../data/ch4_photolysis.yaml");
 
     // set the initial state
-    string X = "CH4:0.02 N2:0.98";
+    std::string X = "CH4:0.02 N2:0.98";
     phase->setState_TPX(200.0, OneAtm, X);
 
     // set wavelength

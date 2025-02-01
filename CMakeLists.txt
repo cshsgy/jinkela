@@ -77,7 +77,6 @@ endif()
 
 message(STATUS "${Blue}${PROJECT_NAME}-3. Setting up project libraries ...${ColorReset}")
 add_subdirectory(src)
-add_subdirectory(cdisort213)
 
 if (BUILD_TESTS)
   message(STATUS "${Blue}${PROJECT_NAME}-4. Setting up unit tests ...${ColorReset}")

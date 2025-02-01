@@ -95,7 +95,7 @@ load_xsection_vulcan(std::vector<std::string> const& files,
     }
   }
 
-  return {torch::Tensor(wavelength), torch::Tensor(xsection)};
+  return {torch::tensor(wavelength), torch::tensor(xsection)};
 }
 
 } // namespace kintera
