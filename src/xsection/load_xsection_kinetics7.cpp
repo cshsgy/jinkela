@@ -6,9 +6,8 @@
 #include <torch/torch.h>
 
 // kintera
-#include "cantera/base/stringUtils.h"
-#include "cantera/kinetics/Reaction.h"
-#include "cantera/kinetics/Photolysis.h"
+#include "reaction.hpp"
+#include "photolysis.hp"
 
 namespace kintera
 {

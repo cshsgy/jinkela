@@ -1,7 +1,4 @@
-//! @file Photolysis.h
-
-#ifndef CT_PHOTOLYSIS_H
-#define CT_PHOTOLYSIS_H
+#pragma once
 
 #include "cantera/base/ct_defs.h"
 #include "cantera/base/Units.h"
@@ -9,8 +6,7 @@
 #include "ReactionRate.h"
 #include "MultiRate.h"
 
-namespace Cantera
-{
+namespace kintera {
 
 int locate(double const *xx, double x, int n);
 void interpn(double *val, double const *coor, double const *data,
@@ -34,13 +30,13 @@ struct PhotolysisData : public ReactionData {
   //!
   //! The wavelength grid is a vector of size nwave.
   //! Default units are nanometers.
-  vector<double> wavelength;
+  torch::Tensor wavelength;
 
   //! \brief actinic flux
   //!
   //! The actinic flux is a vector of size nwave.
   //! Default units are photons cm^-2 s^-1 nm^-1.
-  vector<double> actinicFlux;
+  torch::Tensor actinicFlux;
 };
 
 class PhotolysisBase : public ReactionRate {
@@ -136,28 +132,6 @@ class PhotolysisRate : public PhotolysisBase {
   //! net stoichiometric coefficients of products
   Composition m_net_products;
 };
-
-/**
- * @brief Read the cross-section data from VULCAN format files
- *
- * @param branches Composition of the photodissociation products (no
- * photoabsorption branch). 
- *
- * @param files Vector of filenames.
- * There are two files for each photolysis reaction. The first one is for
- * cross-section data and the second one for the branch ratios.
- *
- * @return a pair of vectors containing the wavelength (m) and cross section data (m^2)
- */
-pair<vector<double>, vector<double>> 
-load_xsection_vulcan(vector<string> const& files, vector<Composition> const& branches);
-
-/**
- * Read the cross-section data from KINETICS7 format files
- */
-
-pair<vector<double>, vector<double>> 
-load_xsection_kinetics7(vector<string> const& files, vector<Composition> const& branches);
 
 }
 

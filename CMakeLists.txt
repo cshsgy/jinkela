@@ -61,7 +61,11 @@ message(STATUS "${Blue}${PROJECT_NAME}-1. Set up project compiler flags ...${Col
 message(STATUS "Include ${CMAKE_CURRENT_SOURCE_DIR}/cmake/compilers.cmake")
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/compilers.cmake)
 
-message(STATUS "${Blue}${PROJECT_NAME}-2. Setting up system libraries ...${ColorReset}")
+message(STATUS "${Blue}${PROJECT_NAME}-2. Setting up project parameters ...${ColorReset}")
+message(STATUS "Include ${CMAKE_CURRENT_SOURCE_DIR}/cmake/parameters.cmake")
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/parameters.cmake)
+
+message(STATUS "${Blue}${PROJECT_NAME}-3. Setting up system libraries ...${ColorReset}")
 include(${CMAKE_SOURCE_DIR}/cmake/fmt.cmake)
 find_package(Torch REQUIRED)
 if (CUDA)
@@ -75,15 +79,16 @@ if (CUDAToolkit_FOUND)
   set(CMAKE_CUDA_STANDARD 17)
 endif()
 
-message(STATUS "${Blue}${PROJECT_NAME}-3. Setting up project libraries ...${ColorReset}")
+message(STATUS "${Blue}${PROJECT_NAME}-4. Setting up project libraries ...${ColorReset}")
+configure_file(${CMAKE_SOURCE_DIR}/configure.h.in configure.h @ONLY)
 add_subdirectory(src)
 
 if (BUILD_TESTS)
-  message(STATUS "${Blue}${PROJECT_NAME}-4. Setting up unit tests ...${ColorReset}")
+  message(STATUS "${Blue}${PROJECT_NAME}-5. Setting up unit tests ...${ColorReset}")
   add_subdirectory(tests)
 endif()
 
 if (BUILD_EXAMPLES)
-  message(STATUS "${Blue}${PROJECT_NAME}-5. Setting up examples ...${ColorReset}")
+  message(STATUS "${Blue}${PROJECT_NAME}-6. Setting up examples ...${ColorReset}")
   add_subdirectory(examples)
 endif()

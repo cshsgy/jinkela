@@ -1,0 +1,9 @@
+#pragma once
+
+// NetCDF output (NETCDFOUTPUT or NO_NETCDFOUTPUT)
+#define @NETCDF_OPTION@
+
+// PNetCDF output (PNETCDFOUTPUT or NO_PNETCDFOUTPUT)
+#define @PNETCDF_OPTION@
+
+constexpr char KINTERA_ROOT_DIR[] = "@CMAKE_CURRENT_SOURCE_DIR@";

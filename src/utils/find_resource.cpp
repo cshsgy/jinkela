@@ -7,6 +7,7 @@
 #include <mutex>
 
 // kintera
+#include <configure.h>
 #include "find_resource.hpp"
 
 namespace kintera {
@@ -56,13 +57,13 @@ std::vector<std::string> deserialize_search_paths(char const* p) {
   dirs.push_back(s.substr(start, end));
   bool found_root = false;
   for (auto dir : dirs) {
-    if (dir.find(HARP_ROOT_DIR) != std::string::npos) {
+    if (dir.find(KINTERA_ROOT_DIR) != std::string::npos) {
       found_root = true;
       break;
     }
   }
   if (!found_root) {
-    dirs.push_back(std::string(HARP_ROOT_DIR) + "/data");
+    dirs.push_back(std::string(KINTERA_ROOT_DIR) + "/data");
   }
   return dirs;
 }
