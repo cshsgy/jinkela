@@ -13,14 +13,11 @@ macro(setup_test namel)
 
   target_include_directories(
     ${namel}.${buildl}
-    PRIVATE ${CMAKE_BINARY_DIR}
-            ${KINTERA_INCLUDE_DIR}
-            SYSTEM
-            ${TORCH_INCLUDE_DIR}
-            SYSTEM
-            ${TORCH_API_INCLUDE_DIR})
+    PRIVATE ${CMAKE_BINARY_DIR} ${KINTERA_INCLUDE_DIR} SYSTEM
+            ${TORCH_INCLUDE_DIR} SYSTEM ${TORCH_API_INCLUDE_DIR})
 
-  target_link_libraries(${namel}.${buildl}
+  target_link_libraries(
+    ${namel}.${buildl}
     PRIVATE kintera::kintera
             ${TORCH_LIBRARY}
             ${TORCH_CPU_LIBRARY}

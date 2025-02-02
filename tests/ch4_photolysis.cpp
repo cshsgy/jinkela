@@ -1,11 +1,10 @@
-#include "gtest/gtest.h"
-#include "cantera/thermo/ThermoFactory.h"
 #include "cantera/kinetics/KineticsFactory.h"
+#include "cantera/thermo/ThermoFactory.h"
+#include "gtest/gtest.h"
 
-namespace Cantera
-{
+namespace Cantera {
 
-class PhotochemTitan: public testing::Test {
+class PhotochemTitan : public testing::Test {
  public:
   // data
   shared_ptr<ThermoPhase> phase;
@@ -92,13 +91,13 @@ TEST_F(PhotochemTitan, check_fwd_rate_constants) {
   ASSERT_NEAR(kH, 0.304324, 1.0e-4);
 
   ASSERT_NEAR(kCH4 + kCH3 + k1CH2 + k3CH2 + kCH, 1.0, 1.0e-14);
-  ASSERT_NEAR(4 * kCH4 + 3 * kCH3 + 2 * k1CH2 + 2 * k3CH2 + kCH + 2 * kH2 + kH, 4.0, 1.0e-14);
+  ASSERT_NEAR(4 * kCH4 + 3 * kCH3 + 2 * k1CH2 + 2 * k3CH2 + kCH + 2 * kH2 + kH,
+              4.0, 1.0e-14);
 }
 
-} // namespace Cantera
+}  // namespace Cantera
 
-int main(int argc, char** argv)
-{
+int main(int argc, char** argv) {
   printf("Running main() from PhotochemTitan.cpp\n");
   Cantera::make_deprecation_warnings_fatal();
   Cantera::printStackTraceOnSegfault();

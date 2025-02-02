@@ -18,7 +18,7 @@ namespace kintera {
 
 struct VulcanXsectionOptions {
   ADD_ARG(std::string, cross_file) = "ch4.txt";
-  ADD_ARG(std::vector<std::string>, branches) = {"CH4"};
+  ADD_ARG(std::vector<std::string>, branches) = { "CH4" };
   ADD_ARG(std::vector<std::string>, species);
 };
 

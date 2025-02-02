@@ -8,6 +8,7 @@
 
 // kintera
 #include <configure.h>
+
 #include "find_resource.hpp"
 
 namespace kintera {

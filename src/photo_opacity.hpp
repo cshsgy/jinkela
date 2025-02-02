@@ -45,4 +45,4 @@ class PhotoOpacityImpl : public torch::nn::Cloneable<PhotoOpacityImpl> {
 };
 TORCH_MODULE(PhotoOpacity);
 
-} // namespace kintera
+}  // namespace kintera

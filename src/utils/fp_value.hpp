@@ -9,4 +9,4 @@ double fp_value(const std::string& val);
 
 double fp_value_check(const std::string& val);
 
-} // namespace kintera
+}  // namespace kintera

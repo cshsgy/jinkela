@@ -1,8 +1,9 @@
 // kintera
+#include "kin7_xsection.hpp"
+
 #include <math/interpolation.hpp>
 #include <utils/find_resource.hpp>
 #include <utils/parse_comp_string.hpp>
-#include "kin7_xsection.hpp"
 
 namespace kintera {
 
@@ -60,7 +61,8 @@ void Kin7XsectionImpl::reset() {
     equation[60] = '\0';
     auto product = parseCompString(equation);
 
-    auto it = std::find(options.branches.begin(), options.branches.end(), product);
+    auto it =
+        std::find(options.branches.begin(), options.branches.end(), product);
 
     if (it == options.branches.end()) {
       // skip this section
@@ -141,7 +143,7 @@ torch::Tensor Kin7XsectionImpl::forward(torch::Tensor wave, torch::Tensor aflux,
 
   if (wave.is_cpu()) {
     call_interpn_cpu<MAX_PHOTO_BRANCHES>(iter, kdata, kwave, dims,
-        /*ndim=*/1, /*nval=*/nbranch);
+                                         /*ndim=*/1, /*nval=*/nbranch);
   } else if (wave.is_cuda()) {
     // call_interpn_cuda<MAX_PHOTO_BRANCHES>(iter, kdata, kwave, dims, 1);
   } else {

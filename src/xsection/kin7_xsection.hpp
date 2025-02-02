@@ -16,7 +16,11 @@ namespace kintera {
 struct Kin7XsectionOptions {
   ADD_ARG(std::string, cross_file) = "ch4.dat2";
   ADD_ARG(std::vector<std::string>, branches) = {
-    "CH4:1", "CH3:1 H:1", "(1)CH2:1 H2:1", "(3)CH2:1 H:2", "CH:1 H2:1 H:1"
+    "CH4:1",
+    "CH3:1 H:1",
+    "(1)CH2:1 H2:1",
+    "(3)CH2:1 H:2",
+    "CH:1 H2:1 H:1"
   };
   ADD_ARG(std::vector<std::string>, species);
   ADD_ARG(int, reaction_id) = 0;
@@ -54,13 +58,13 @@ class Kin7XsectionImpl : public torch::nn::Cloneable<Kin7XsectionImpl> {
    *
    * \param aflux actinic flux [photons nm^-1]
    *        (nwave, ncol, nlyr)
-   * 
+   *
    * \param kcross (out) total photo x-section [cm^2 molecule^-1]
    *        (nreaction, nwave, ncol, nlyr)
-   * 
+   *
    * \param temp temperature [K]
    *        (ncol, nlyr)
-   * 
+   *
    * \return effective stoichiometric coefficients
    *         (ncol, nlyr, nspecies)
    */

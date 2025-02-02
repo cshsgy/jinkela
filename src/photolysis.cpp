@@ -1,17 +1,16 @@
 //! @file Photolysis.cpp
 
-#include "cantera/kinetics/Kinetics.h"
 #include "cantera/kinetics/Photolysis.h"
+
+#include "cantera/base/stringUtils.h"
+#include "cantera/kinetics/Kinetics.h"
 #include "cantera/kinetics/Reaction.h"
 #include "cantera/kinetics/ReactionRateFactory.h"
 #include "cantera/thermo/ThermoPhase.h"
-#include "cantera/base/stringUtils.h"
 
-namespace Cantera
-{
+namespace Cantera {
 
-bool PhotolysisData::update(const ThermoPhase& thermo, const Kinetics& kin)
-{
+bool PhotolysisData::update(const ThermoPhase& thermo, const Kinetics& kin) {
   bool changed = false;
   double T = thermo.temperature();
   if (T != temperature) {
@@ -36,54 +35,51 @@ bool PhotolysisData::update(const ThermoPhase& thermo, const Kinetics& kin)
   return changed;
 }
 
-bool PhotolysisData::check() const
-{
-    // Check that the wavelength grid is valid
-    if (wavelength.size() < 2) {
-        throw CanteraError("PhotolysisData::update",
-                           "Wavelength grid must have at least two points.");
-    }
+bool PhotolysisData::check() const {
+  // Check that the wavelength grid is valid
+  if (wavelength.size() < 2) {
+    throw CanteraError("PhotolysisData::update",
+                       "Wavelength grid must have at least two points.");
+  }
 
-    if (wavelength[0] <= 0.0) {
-        throw CanteraError("PhotolysisData::update",
-                           "Wavelength grid must be positive.");
-    }
+  if (wavelength[0] <= 0.0) {
+    throw CanteraError("PhotolysisData::update",
+                       "Wavelength grid must be positive.");
+  }
 
-    for (size_t i = 1; i < wavelength.size(); i++) {
-        if (wavelength[i] <= wavelength[i-1]) {
-            throw CanteraError("PhotolysisData::update",
-                               "Wavelength grid must be strictly increasing.");
-        }
+  for (size_t i = 1; i < wavelength.size(); i++) {
+    if (wavelength[i] <= wavelength[i - 1]) {
+      throw CanteraError("PhotolysisData::update",
+                         "Wavelength grid must be strictly increasing.");
     }
+  }
 
-    // Check that the actinic flux is valid
-    if (actinicFlux.empty()) {
-        throw CanteraError("PhotolysisData::update",
-                           "Actinic flux is empty.");
+  // Check that the actinic flux is valid
+  if (actinicFlux.empty()) {
+    throw CanteraError("PhotolysisData::update", "Actinic flux is empty.");
+  }
+
+  if (actinicFlux.size() != wavelength.size()) {
+    throw CanteraError(
+        "PhotolysisData::update",
+        "Actinic flux must have the same size as the wavelength grid.");
+  }
+
+  for (size_t i = 0; i < actinicFlux.size(); i++) {
+    if (actinicFlux[i] < 0.0) {
+      throw CanteraError("PhotolysisData::update",
+                         "Actinic flux must be non-negative.");
     }
+  }
 
-    if (actinicFlux.size() != wavelength.size()) {
-        throw CanteraError("PhotolysisData::update",
-                           "Actinic flux must have the same size as the wavelength grid.");
-    }
-
-    for (size_t i = 0; i < actinicFlux.size(); i++) {
-        if (actinicFlux[i] < 0.0) {
-            throw CanteraError("PhotolysisData::update",
-                               "Actinic flux must be non-negative.");
-        }
-    }
-
-    return true;
+  return true;
 }
 
-PhotolysisBase::PhotolysisBase(
-    vector<double> const& temp, 
-    vector<double> const& wavelength,
-    vector<std::string> const& branches,
-    vector<double> const& xsection):
-  m_crossSection(xsection)
-{
+PhotolysisBase::PhotolysisBase(vector<double> const& temp,
+                               vector<double> const& wavelength,
+                               vector<std::string> const& branches,
+                               vector<double> const& xsection)
+    : m_crossSection(xsection) {
   m_ntemp = temp.size();
   m_nwave = wavelength.size();
 
@@ -101,22 +97,22 @@ PhotolysisBase::PhotolysisBase(
   }
 
   if (m_ntemp * m_nwave * branches.size() != m_crossSection.size()) {
-    throw CanteraError("PhotolysisBase::PhotolysisBase",
-                       "Cross-section data size does not match the temperature, "
-                       "wavelength, and branch grid sizes.");
+    throw CanteraError(
+        "PhotolysisBase::PhotolysisBase",
+        "Cross-section data size does not match the temperature, "
+        "wavelength, and branch grid sizes.");
   }
 
   m_valid = true;
 }
 
-PhotolysisBase::PhotolysisBase(AnyMap const& node, UnitStack const& rate_units)
-{
+PhotolysisBase::PhotolysisBase(AnyMap const& node,
+                               UnitStack const& rate_units) {
   setParameters(node, rate_units);
 }
 
-void PhotolysisBase::setRateParameters(AnyValue const& rate, 
-                                       map<string, int> const& branch_map)
-{
+void PhotolysisBase::setRateParameters(AnyValue const& rate,
+                                       map<string, int> const& branch_map) {
   if (rate.hasKey("resolution")) {
     double resolution = rate["resolution"].asDouble();
     if (resolution <= 0.0) {
@@ -145,8 +141,8 @@ void PhotolysisBase::setRateParameters(AnyValue const& rate,
   }
 }
 
-void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_units)
-{
+void PhotolysisBase::setParameters(AnyMap const& node,
+                                   UnitStack const& rate_units) {
   map<string, int> branch_map;
   pair<vector<double>, vector<double>> result;
   vector<double> temperature;
@@ -158,8 +154,9 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
   parseReactionEquation(rtmp, node["equation"].asString(), node, nullptr);
 
   if (rtmp.reactants.size() != 1 || rtmp.reactants.begin()->second != 1) {
-    throw CanteraError("PhotolysisBase::setParameters",
-                       "Photolysis reaction must have one reactant with stoichiometry 1.");
+    throw CanteraError(
+        "PhotolysisBase::setParameters",
+        "Photolysis reaction must have one reactant with stoichiometry 1.");
   }
 
   // b0 is reserved for the photoabsorption cross section
@@ -179,12 +176,12 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
       branch_map[branch_name] = m_branch.size();
       m_branch.push_back(parseCompString(branch["product"].asString()));
     }
-  } else if (rtmp.products != rtmp.reactants) { // this is not photoabsorption
+  } else if (rtmp.products != rtmp.reactants) {  // this is not photoabsorption
     m_branch.push_back(rtmp.products);
   }
 
   if (node.hasKey("cross-section")) {
-    for (auto const& data: node["cross-section"].asVector<AnyMap>()) {
+    for (auto const& data : node["cross-section"].asVector<AnyMap>()) {
       auto format = data["format"].asString();
       auto temp = data["temperature-range"].asVector<double>(2, 2);
       if (temp[0] >= temp[1]) {
@@ -205,7 +202,7 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
       }
 
       if (format == "YAML") {
-        for (auto const& entry: data["data"].asVector<vector<double>>()) {
+        for (auto const& entry : data["data"].asVector<vector<double>>()) {
           result.first.push_back(entry[0]);
           result.second.push_back(entry[1]);
         }
@@ -222,8 +219,8 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
     }
   }
 
-  vector<double> &wavelength(result.first);
-  vector<double> &xsection(result.second);
+  vector<double>& wavelength(result.first);
+  vector<double>& xsection(result.second);
 
   m_ntemp = temperature.size();
   m_nwave = wavelength.size();
@@ -255,25 +252,25 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
       std::cout << name << " " << stoich << std::endl;
     }
   }
-  std::cout << "number of cross-section: " << m_crossSection.size() << std::endl;
+  std::cout << "number of cross-section: " << m_crossSection.size() <<
+  std::endl;
   */
 
   if (m_ntemp * m_nwave * m_branch.size() != m_crossSection.size()) {
-    throw CanteraError("PhotolysisBase::PhotolysisBase",
-                       "Cross-section data size does not match the temperature, "
-                       "wavelength, and branch grid sizes.");
+    throw CanteraError(
+        "PhotolysisBase::PhotolysisBase",
+        "Cross-section data size does not match the temperature, "
+        "wavelength, and branch grid sizes.");
   }
 
   m_valid = true;
 }
 
-void PhotolysisBase::getRateParameters(AnyMap& node) const
-{
+void PhotolysisBase::getRateParameters(AnyMap& node) const {
   node.setFlowStyle();
 }
 
-void PhotolysisBase::getParameters(AnyMap& node) const
-{
+void PhotolysisBase::getParameters(AnyMap& node) const {
   AnyMap rateNode;
   getRateParameters(rateNode);
 
@@ -282,25 +279,26 @@ void PhotolysisBase::getParameters(AnyMap& node) const
   }
 }
 
-void PhotolysisBase::check(string const& equation)
-{
+void PhotolysisBase::check(string const& equation) {
   if (m_ntemp < 2) {
-    throw InputFileError("PhotolysisBase::check", m_input,
-                       "Insufficient temperature data provided for reaction '{}'.", equation);
+    throw InputFileError(
+        "PhotolysisBase::check", m_input,
+        "Insufficient temperature data provided for reaction '{}'.", equation);
   }
 
   // should change later
   if (m_nwave < 0) {
     throw InputFileError("PhotolysisBase::check", m_input,
-                       "No wavelength data provided for reaction '{}'.", equation);
+                         "No wavelength data provided for reaction '{}'.",
+                         equation);
   }
 }
 
-void PhotolysisBase::validate(string const& equation, Kinetics const& kin)
-{
+void PhotolysisBase::validate(string const& equation, Kinetics const& kin) {
   if (!valid()) {
     throw InputFileError("PhotolysisBase::validate", m_input,
-                       "Rate object for reaction '{}' is not configured.", equation);
+                         "Rate object for reaction '{}' is not configured.",
+                         equation);
   }
 
   std::vector<std::string> tokens;
@@ -331,13 +329,15 @@ void PhotolysisBase::validate(string const& equation, Kinetics const& kin)
   }
 
   if (species_from_equation != species_from_branches) {
-    throw InputFileError("PhotolysisBase::validate", m_input,
-                       "Reaction '{}' has different products than the photolysis branches.", equation);
+    throw InputFileError(
+        "PhotolysisBase::validate", m_input,
+        "Reaction '{}' has different products than the photolysis branches.",
+        equation);
   }
 }
 
-vector<double> PhotolysisBase::getCrossSection(double temp, double wavelength) const
-{
+vector<double> PhotolysisBase::getCrossSection(double temp,
+                                               double wavelength) const {
   if (m_crossSection.empty()) {
     return {0.};
   }
@@ -348,104 +348,102 @@ vector<double> PhotolysisBase::getCrossSection(double temp, double wavelength) c
   size_t len[2] = {m_ntemp, m_nwave};
 
   interpn(cross.data(), coord, m_crossSection.data(), m_temp_wave_grid.data(),
-      len, 2, m_branch.size());
+          len, 2, m_branch.size());
 
   return cross;
 }
 
 double PhotolysisRate::evalFromStruct(PhotolysisData const& data) {
-    double wmin = m_temp_wave_grid[m_ntemp];
-    double wmax = m_temp_wave_grid.back();
+  double wmin = m_temp_wave_grid[m_ntemp];
+  double wmax = m_temp_wave_grid.back();
 
-    if (m_crossSection.empty() ||
-        wmin > data.wavelength.back() || 
-        wmax < data.wavelength.front()) 
-    {
-      for (size_t n = 1; n < m_branch.size(); n++)
-        for (auto const& [name, stoich] : m_branch[n])
-          m_net_products[name] = 0.;
-
-      return 0.;
-    }
-
-    /* debug
-    std::cout << "wavelength data range: " << wmin << " " << wmax << std::endl;
-    std::cout << "temperature = " << data.temperature << std::endl;
-    std::cout << "wavelength = " << std::endl;
-    for (auto w : data.wavelength) {
-      std::cout << w << std::endl;
-    }
-    std::cout << "nbranch = " << m_branch.size() << std::endl;*/
-
-    double* cross1 = new double [m_branch.size()];
-    double* cross2 = new double [m_branch.size()];
-
-    double coord[2] = {data.temperature, data.wavelength[0]};
-    size_t len[2] = {m_ntemp, m_nwave};
-
-    // debug
-    //std::cout << "coord = " << coord[0] << " " << coord[1] << std::endl;
-
-    interpn(cross1, coord, m_crossSection.data(), m_temp_wave_grid.data(),
-        len, 2, m_branch.size());
-
-    double total_rate = 0.0;
-    // prevent division by zero
-    double eps = 1.e-30;
-    double total_rate_eps = 0.;
-
-    // first branch is photoabsorption
+  if (m_crossSection.empty() || wmin > data.wavelength.back() ||
+      wmax < data.wavelength.front()) {
     for (size_t n = 1; n < m_branch.size(); n++)
-      for (auto const& [name, stoich] : m_branch[n])
-        m_net_products[name] = 0.;
+      for (auto const& [name, stoich] : m_branch[n]) m_net_products[name] = 0.;
 
-    /* debug
-    std::cout << m_crossSection[0] << std::endl;
-    std::cout << m_crossSection[1] << std::endl;
-    std::cout << m_crossSection[2] << std::endl;
-    std::cout << "grid = " << std::endl;
-    for (size_t n = 0; n < m_temp_wave_grid.size(); n++) {
-      std::cout << m_temp_wave_grid[n] << std::endl;
-    }*/
+    return 0.;
+  }
 
-    for (size_t i = 0; i < data.wavelength.size() - 1; ++i) {
+  /* debug
+  std::cout << "wavelength data range: " << wmin << " " << wmax << std::endl;
+  std::cout << "temperature = " << data.temperature << std::endl;
+  std::cout << "wavelength = " << std::endl;
+  for (auto w : data.wavelength) {
+    std::cout << w << std::endl;
+  }
+  std::cout << "nbranch = " << m_branch.size() << std::endl;*/
+
+  double* cross1 = new double[m_branch.size()];
+  double* cross2 = new double[m_branch.size()];
+
+  double coord[2] = {data.temperature, data.wavelength[0]};
+  size_t len[2] = {m_ntemp, m_nwave};
+
+  // debug
+  // std::cout << "coord = " << coord[0] << " " << coord[1] << std::endl;
+
+  interpn(cross1, coord, m_crossSection.data(), m_temp_wave_grid.data(), len, 2,
+          m_branch.size());
+
+  double total_rate = 0.0;
+  // prevent division by zero
+  double eps = 1.e-30;
+  double total_rate_eps = 0.;
+
+  // first branch is photoabsorption
+  for (size_t n = 1; n < m_branch.size(); n++)
+    for (auto const& [name, stoich] : m_branch[n]) m_net_products[name] = 0.;
+
+  /* debug
+  std::cout << m_crossSection[0] << std::endl;
+  std::cout << m_crossSection[1] << std::endl;
+  std::cout << m_crossSection[2] << std::endl;
+  std::cout << "grid = " << std::endl;
+  for (size_t n = 0; n < m_temp_wave_grid.size(); n++) {
+    std::cout << m_temp_wave_grid[n] << std::endl;
+  }*/
+
+  for (size_t i = 0; i < data.wavelength.size() - 1; ++i) {
+    // debug
+    // std::cout << "wavelength = " << data.wavelength[i] << " " <<
+    // data.wavelength[i+1] << std::endl;
+    coord[1] = data.wavelength[i + 1];
+    interpn(cross2, coord, m_crossSection.data(), m_temp_wave_grid.data(), len,
+            2, m_branch.size());
+
+    // photodissociation only
+    for (size_t n = 1; n < m_branch.size(); n++) {
+      double rate = 0.5 * (data.wavelength[i + 1] - data.wavelength[i]) *
+                    (cross1[n] * data.actinicFlux[i] +
+                     cross2[n] * data.actinicFlux[i + 1]);
+
       // debug
-      //std::cout << "wavelength = " << data.wavelength[i] << " " << data.wavelength[i+1] << std::endl;
-      coord[1] = data.wavelength[i+1];
-      interpn(cross2, coord, m_crossSection.data(), m_temp_wave_grid.data(),
-          len, 2, m_branch.size());
+      // std::cout << "actinic flux [ " << i << "] = " << data.actinicFlux[i] <<
+      // " " << data.actinicFlux[i+1] << std::endl; std::cout << "cross section
+      // [ " << n << "] = " << cross1[n] << " " << cross2[n] << std::endl;
 
-      // photodissociation only
-      for (size_t n = 1; n < m_branch.size(); n++) {
-        double rate = 0.5 * (data.wavelength[i+1] - data.wavelength[i])
-          * (cross1[n] * data.actinicFlux[i] + cross2[n] * data.actinicFlux[i+1]);
-
-        // debug
-        //std::cout << "actinic flux [ " << i << "] = " << data.actinicFlux[i] << " " << data.actinicFlux[i+1] << std::endl;
-        //std::cout << "cross section [ " << n << "] = " << cross1[n] << " " << cross2[n] << std::endl;
-        
-        for (auto const& [name, stoich] : m_branch[n]) {
-          m_net_products.at(name) += (rate + eps) * stoich;
-        }
-        total_rate += rate;
-        total_rate_eps += rate + eps;
-
-        cross1[n] = cross2[n];
+      for (auto const& [name, stoich] : m_branch[n]) {
+        m_net_products.at(name) += (rate + eps) * stoich;
       }
+      total_rate += rate;
+      total_rate_eps += rate + eps;
+
+      cross1[n] = cross2[n];
     }
+  }
 
-    for (auto& [name, stoich] : m_net_products)
-      stoich /= total_rate_eps;
+  for (auto& [name, stoich] : m_net_products) stoich /= total_rate_eps;
 
-    /* debug
-    for (auto const& [name, stoich] : m_net_products)
-      std::cout << name << " " << stoich << std::endl;
-    std::cout << "photodissociation rate: " << total_rate << std::endl;*/
+  /* debug
+  for (auto const& [name, stoich] : m_net_products)
+    std::cout << name << " " << stoich << std::endl;
+  std::cout << "photodissociation rate: " << total_rate << std::endl;*/
 
-    delete [] cross1;
-    delete [] cross2;
+  delete[] cross1;
+  delete[] cross2;
 
-    return total_rate;
+  return total_rate;
 }
 
-}
+}  // namespace Cantera

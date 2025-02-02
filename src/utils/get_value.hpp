@@ -11,9 +11,10 @@ namespace kintera {
  * found instead of throwing an exception.
  */
 template <class T, class U>
-const U& get_value(const std::map<T, U>& m, const T& key, const U& default_val) {
-    typename std::map<T,U>::const_iterator iter = m.find(key);
-    return (iter == m.end()) ? default_val : iter->second;
+const U& get_value(const std::map<T, U>& m, const T& key,
+                   const U& default_val) {
+  typename std::map<T, U>::const_iterator iter = m.find(key);
+  return (iter == m.end()) ? default_val : iter->second;
 }
 
-} // namespace kintera
+}  // namespace kintera

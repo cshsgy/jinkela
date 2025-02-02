@@ -9,14 +9,13 @@
 // kintera
 #include "reaction.hpp"
 
-namespace kintera
-{
+namespace kintera {
 
-std::pair<torch::Tensor, torch::Tensor> 
-load_xsection_vulcan(std::vector<std::string> const& files,
-                     std::vector<Composition> const& branches)
-{
-  TORCH_CHECK(files.size() == 2, "Only two files can be loaded for Vulcan format.");
+std::pair<torch::Tensor, torch::Tensor> load_xsection_vulcan(
+    std::vector<std::string> const& files,
+    std::vector<Composition> const& branches) {
+  TORCH_CHECK(files.size() == 2,
+              "Only two files can be loaded for Vulcan format.");
 
   // read cross sections
   FILE* file1 = fopen(files[0].c_str(), "r");
@@ -30,7 +29,7 @@ load_xsection_vulcan(std::vector<std::string> const& files,
   // first branch is the photoabsorption cross section (no dissociation)
   int nbranch = branches.size();
 
-  char *line = NULL;
+  char* line = NULL;
   size_t len = 0;
   ssize_t read;
 
@@ -63,14 +62,14 @@ load_xsection_vulcan(std::vector<std::string> const& files,
 
   std::vector<double> bwave;
   std::vector<double> bratio;
-  
+
   // read two header lines
   getline(&line, &len, file2);
   getline(&line, &len, file2);
 
   // read content
   while ((read = getline(&line, &len, file1)) != -1) {
-    char *token = strtok(line, ",");
+    char* token = strtok(line, ",");
     // nm -> m
     bwave.push_back(atof(token) * 1.e-9);
 
@@ -88,7 +87,8 @@ load_xsection_vulcan(std::vector<std::string> const& files,
   std::vector<double> br(nbranch - 1);
 
   for (size_t i = 0; i < wavelength.size(); ++i) {
-    interpn(br.data(), &wavelength[i], bratio.data(), bwave.data(), &len, 1, nbranch - 1);
+    interpn(br.data(), &wavelength[i], bratio.data(), bwave.data(), &len, 1,
+            nbranch - 1);
 
     for (int j = 1; j < nbranch; ++j) {
       xsection[i * nbranch + j] *= br[j - 1];
@@ -98,4 +98,4 @@ load_xsection_vulcan(std::vector<std::string> const& files,
   return {torch::tensor(wavelength), torch::tensor(xsection)};
 }
 
-} // namespace kintera
+}  // namespace kintera

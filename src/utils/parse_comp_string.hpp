@@ -24,14 +24,14 @@
  * \param ss    original string consisting of multiple key:composition
  *              pairs on multiple lines
  *
- * \param names (optional) valid names for elements in the composition map. 
+ * \param names (optional) valid names for elements in the composition map.
  *              If empty or unspecified, all values are allowed.
  *
  * \return      map of names to values
  */
 namespace kintera {
-  
-Composition parse_comp_string(const string& ss,
-                              const vector<string>& names=vector<string>());
 
-} // namespace kintera
+Composition parse_comp_string(const string& ss,
+                              const vector<string>& names = vector<string>());
+
+}  // namespace kintera
