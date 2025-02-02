@@ -7,9 +7,8 @@
 
 namespace kintera {
 
-Kin7XsectionImpl::Kin7XsectionImpl(S8RTOptions const& options_) 
-  : options(options_) 
-{
+Kin7XsectionImpl::Kin7XsectionImpl(S8RTOptions const& options_)
+    : options(options_) {
   reset();
 }
 
@@ -23,11 +22,12 @@ void Kin7XsectionImpl::reset() {
   std::vector<double> wavelength;
   std::vector<double> xsection;
 
-  // first cross section data is always the photoabsorption cross section (no dissociation)
+  // first cross section data is always the photoabsorption cross section (no
+  // dissociation)
   int nbranch = branches.size();
   int min_is = 9999, max_ie = 0;
 
-  char *line = NULL;
+  char* line = NULL;
   size_t len = 0;
   ssize_t read;
 
@@ -41,7 +41,8 @@ void Kin7XsectionImpl::reset() {
     float temp;
 
     // read header
-    int num = sscanf(line, "%60c%4d%4d%4d%6f", equation, &is, &ie, &nwave, &temp);
+    int num =
+        sscanf(line, "%60c%4d%4d%4d%6f", equation, &is, &ie, &nwave, &temp);
     min_is = std::min(min_is, is);
     max_ie = std::max(max_ie, ie);
 
@@ -55,7 +56,7 @@ void Kin7XsectionImpl::reset() {
     // read content
     int ncols = 7;
     int nrows = ceil(1. * nwave / ncols);
-    
+
     equation[60] = '\0';
     auto product = parseCompString(equation);
 
@@ -63,16 +64,16 @@ void Kin7XsectionImpl::reset() {
 
     if (it == branches.end()) {
       // skip this section
-      for (int i = 0; i < nrows; i++)
-        getline(&line, &len, file);
+      for (int i = 0; i < nrows; i++) getline(&line, &len, file);
     } else {
       for (int i = 0; i < nrows; i++) {
         getline(&line, &len, file);
 
         for (int j = 0; j < ncols; j++) {
           float wave, cross;
-          int num = sscanf(line + 17*j, "%7f%10f", &wave, &cross);
-          TORCH_CHECK(num == 2, "Cross-section format from file '", filename, "' is wrong.");
+          int num = sscanf(line + 17 * j, "%7f%10f", &wave, &cross);
+          TORCH_CHECK(num == 2, "Cross-section format from file '", filename,
+                      "' is wrong.");
           int b = it - branches.begin();
           int k = i * ncols + j;
 
@@ -107,45 +108,58 @@ void Kin7XsectionImpl::reset() {
   fclose(file);
 
   kwave = register_buffer("kwave", torch::tensor(wavelength));
-  kdata = register_buffer("kdata", torch::tensor(xsection).view({wavelength.size(), nbranch}));
+  kdata = register_buffer(
+      "kdata", torch::tensor(xsection).view({wavelength.size(), nbranch}));
 }
 
-torch::Tensor Kin7XsectionImpl::forward(torch::Tensor wave, 
-                                        torch::Tensor aflux,
+torch::Tensor Kin7XsectionImpl::forward(torch::Tensor wave, torch::Tensor aflux,
+                                        torch::optional<torch::Tensor> kcross,
                                         torch::optional<torch::Tensor> temp) {
-  int nwve = wave.size(0);
-  int ncol = conc.size(0);
-  int nlyr = conc.size(1);
-  constexpr int nprop = 2 + S8RTOptions::npmom;
+  int nwave = aflux.size(0);
+  int ncol = aflux.size(0);
+  int nlyr = aflux.size(1);
+  int nbranch = options.branches().size();
+  int nspecies = options.species().size();
 
-  auto out = torch::zeros({nwve, ncol, nlyr, nprop}, conc.options());
   auto dims = torch::tensor(
       {kwave.size(0)},
-      torch::TensorOptions().dtype(torch::kInt64).device(conc.device()));
+      torch::TensorOptions().dtype(torch::kInt64).device(aflux.device()));
 
-  auto iter = at::TensorIteratorConfig()
-                  .resize_outputs(false)
-                  .check_all_same_dtype(true)
-                  .declare_static_shape(out.sizes(), /*squash_dims=*/3)
-                  .add_output(out)
-                  .add_owned_const_input(wave.view({-1, 1, 1, 1}))
-                  .build();
+  auto out = torch::empty({nwave, ncol, nlyr, nbranch},
+                          torch::TensorOptions().device(aflux.device()));
 
-  if (conc.is_cpu()) {
-    call_interpn_cpu<nprop>(iter, kdata, kwave, dims, 1);
-  } else if (conc.is_cuda()) {
-    // call_interpn_cuda<nprop>(iter, kdata, kwave, dims, 1);
+  auto iter =
+      at::TensorIteratorConfig()
+          .resize_outputs(false)
+          .check_all_same_dtype(true)
+          .declare_static_shape(out.sizes())
+          .add_output(out)
+          .add_owned_const_input(
+              wave.view({-1, 1, 1, 1}).expand({-1, ncol, nlyr, nbranch}))
+          .build();
+
+  if (aflux.is_cpu()) {
+    call_interpn_cpu<MAX_PHOTO_BRANCHES>(iter, kdata, kwave, dims, /*ndim=*/1);
+  } else if (aflux.is_cuda()) {
+    // call_interpn_cuda<MAX_PHOTO_BRANCHES>(iter, kdata, kwave, dims, 1);
   } else {
     TORCH_CHECK(false, "Unsupported device");
   }
 
-  // attenuation [1/m]
-  out.select(3, 0) *= conc.select(2, options.species_id()).unsqueeze(0);
+  // save the interpolated cross section
+  // (nreaction, nwave, ncol, nlyr)
+  if (kcross.has_value()) {
+    kcross.value()[options.reaction_id()].copy_(out.sum(3));
+  }
 
-  // attenuation weighted single scattering albedo [1/m]
-  out.select(3, 1) *= out.select(3, 0);
+  // (ncol, nlyr, nbranch)
+  auto rate = torch::trapezoid(aflux.unsqueeze(-1) * out.narrow(3, 0, nbranch),
+                               wave, 0);
+  // total_rate = rate.sum(2);
 
-  return out;
+  // (ncol, nlyr, nspecies)
+  return (rate.unsqueeze(-1) * stoich.view({1, 1, nbranch, nspecies)).sum(2)
+    / rate.sum(2).unsqueeze(-1);
 }
 
 }  // namespace kintera

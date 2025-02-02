@@ -58,24 +58,14 @@ reactions:
 - equation: CH4 => CH4 + CH3 + (1)CH2 + (3)CH2 + CH + H2 + H
   type: photolysis
   branches:
-    - name: b1
-      product: "CH4:1"
-    - name: b2
-      product: "CH3:1 H:1"
-    - name: b3
-      product: "(1)CH2:1 H2:1"
-    - name: b4
-      product: "(3)CH2:1 H:2"
-    - name: b5
-      product: "CH:1 H2:1 H:1"
+    - "CH4:1"
+    - "CH3:1 H:1"
+    - "(1)CH2:1 H2:1"
+    - "(3)CH2:1 H:2"
+    - "CH:1 H2:1 H:1"
   cross-section:
     - format: KINETICS7
-      temperature-range: [0., 300.]
-      filenames: [../data/cross/CH4.dat2]
-  rate-constants:
-    resolution: 0.1
-    scale:
-      b1: 1
+      filename: "CH4.dat2"
 
 - equation: N2 => N2
   type: photolysis

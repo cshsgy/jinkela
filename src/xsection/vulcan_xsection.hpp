@@ -12,17 +12,18 @@
 #include <configure.h>
 #include <add_arg.h>
 // clang-format on
+#include "xsection.hpp"
 
 namespace kintera {
 
-struct Kin7XsectionOptions {
+struct VulcanXsectionOptions {
   ADD_ARG(std::string, cross_file) = "ch4.txt";
   ADD_ARG(std::vector<std::string>, branches) = {"CH4"};
   ADD_ARG(std::vector<std::string>, species);
-  ADD_ARG(int, reaction_id) = 0;
 };
 
-class Kin7XsectionImpl : public torch::nn::Cloneable<Kin7XsectionImpl> {
+class VulcanXsectionImpl : public torch::nn::Cloneable<VulcanXsectionImpl>,
+                           protected XsectionImpl {
  public:
   //! wavelength [nm]
   //! (nwave,)
@@ -32,28 +33,22 @@ class Kin7XsectionImpl : public torch::nn::Cloneable<Kin7XsectionImpl> {
   //! (nwave, nbranch)
   torch::Tensor kdata;
 
-  //! stoichiometric coefficients of each branch
-  //! (nbranch, nspecies)
-  torch::Tensor stoich;
-
-  //! options with which this `Kin7XsectionImpl` was constructed
-  Kin7XsectionOptions options;
+  //! options with which this `VulcanXsectionImpl` was constructed
+  VulcanXsectionOptions options;
 
   //! Constructor to initialize the layer
-  Kin7XsectionImpl() = default;
-  explicit Kin7XsectionImpl(S8RTOptions const& options_);
+  VulcanXsectionImpl() = default;
+  explicit VulcanXsectionImpl(S8RTOptions const& options_);
   void reset() override;
 
   //! Get effective stoichiometric coefficients
   //! \param wave wavelength [nm], (nwave, ncol, nlyr)
-  //! \param aflux actinic flux [photons nm^-1], (nwave, ncol, nlyr)
-  //! \param kcross photo x-section [cm^2 molecule^-1], (nreaction, nwave, ncol,
-  //! nlyr) \param temp temperature [K], (ncol, nlyr) \return effective
-  //! stoichiometric coeff, (ncol, nlyr, nspecies)
+  //! \param actinic flux [photons nm^-1], (nwave, ncol, nlyr)
+  //! \param temp temperature [K], (ncol, nlyr)
+  //! \return effective stoichiometric coeff, (ncol, nlyr, nspecies)
   torch::Tensor forward(torch::Tensor wave, torch::Tensor aflux,
-                        torch::optional<torch::Tensor> kcross = torch::nullopt,
                         torch::optional<torch::Tensor> temp = torch::nullopt);
 };
-TORCH_MODULE(Kin7Xsection);
+TORCH_MODULE(VulcanXsection);
 
 }  // namespace kintera

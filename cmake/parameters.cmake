@@ -15,3 +15,8 @@ else()
   set(PNETCDF_OPTION "PNETCDFOUTPUT")
   find_package(PNetCDF REQUIRED)
 endif()
+
+# maximum number of branches of photolysis reactions
+if(NOT MAX_PHOTO_BRANCHES OR NOT DEFINED MAX_PHOTO_BRANCHES)
+  set(MAX_PHOTO_BRANCHES 3)
+endif()
