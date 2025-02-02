@@ -28,7 +28,7 @@ class Kin7XsectionImpl : public torch::nn::Cloneable<Kin7XsectionImpl> {
   //! (nwave,)
   torch::Tensor kwave;
 
-  //! photo x-section [cm^2/molecule]
+  //! photo x-section [cm^2 molecule^-1]
   //! (nwave, nbranch)
   torch::Tensor kdata;
 
@@ -46,10 +46,16 @@ class Kin7XsectionImpl : public torch::nn::Cloneable<Kin7XsectionImpl> {
 
   //! Get effective stoichiometric coefficients
   //! \param wave wavelength [nm], (nwave, ncol, nlyr)
-  //! \param aflux actinic flux [photons nm^-1], (nwave, ncol, nlyr)
-  //! \param kcross photo x-section [cm^2 molecule^-1], (nreaction, nwave, ncol,
-  //! nlyr) \param temp temperature [K], (ncol, nlyr) \return effective
-  //! stoichiometric coeff, (ncol, nlyr, nspecies)
+  //! \param aflux actinic flux [photons nm^-1]
+  //!        (nwave, ncol, nlyr)
+  //
+  //! \param kcross (out) total photo x-section [cm^2 molecule^-1]
+  //!        (nreaction, nwave, ncol, nlyr)
+  //
+  //! \param temp temperature [K], (ncol, nlyr)
+  //
+  //! \return effective stoichiometric coefficients
+  //          (ncol, nlyr, nspecies)
   torch::Tensor forward(torch::Tensor wave, torch::Tensor aflux,
                         torch::optional<torch::Tensor> kcross = torch::nullopt,
                         torch::optional<torch::Tensor> temp = torch::nullopt);

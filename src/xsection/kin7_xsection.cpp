@@ -123,10 +123,10 @@ torch::Tensor Kin7XsectionImpl::forward(torch::Tensor wave, torch::Tensor aflux,
 
   auto dims = torch::tensor(
       {kwave.size(0)},
-      torch::TensorOptions().dtype(torch::kInt64).device(aflux.device()));
+      torch::TensorOptions().dtype(torch::kInt64).device(wave.device()));
 
   auto out = torch::empty({nwave, ncol, nlyr, nbranch},
-                          torch::TensorOptions().device(aflux.device()));
+                          torch::TensorOptions().device(wave.device()));
 
   auto iter =
       at::TensorIteratorConfig()
@@ -138,9 +138,9 @@ torch::Tensor Kin7XsectionImpl::forward(torch::Tensor wave, torch::Tensor aflux,
               wave.view({-1, 1, 1, 1}).expand({-1, ncol, nlyr, nbranch}))
           .build();
 
-  if (aflux.is_cpu()) {
+  if (wave.is_cpu()) {
     call_interpn_cpu<MAX_PHOTO_BRANCHES>(iter, kdata, kwave, dims, /*ndim=*/1);
-  } else if (aflux.is_cuda()) {
+  } else if (wave.is_cuda()) {
     // call_interpn_cuda<MAX_PHOTO_BRANCHES>(iter, kdata, kwave, dims, 1);
   } else {
     TORCH_CHECK(false, "Unsupported device");
@@ -153,8 +153,7 @@ torch::Tensor Kin7XsectionImpl::forward(torch::Tensor wave, torch::Tensor aflux,
   }
 
   // (ncol, nlyr, nbranch)
-  auto rate = torch::trapezoid(aflux.unsqueeze(-1) * out.narrow(3, 0, nbranch),
-                               wave, 0);
+  auto rate = torch::trapezoid(aflux.unsqueeze(-1) * out, wave, 0);
   // total_rate = rate.sum(2);
 
   // (ncol, nlyr, nspecies)
