@@ -1,13 +1,12 @@
 // kintera
-#include "kin7_xsection.hpp"
-
 #include <math/interpolation.hpp>
-#include <utils/fileio.hpp>
 #include <utils/find_resource.hpp>
+#include <utils/parse_comp_string.hpp>
+#include "kin7_xsection.hpp"
 
 namespace kintera {
 
-Kin7XsectionImpl::Kin7XsectionImpl(S8RTOptions const& options_)
+Kin7XsectionImpl::Kin7XsectionImpl(Kin7XsectionOptions const& options_)
     : options(options_) {
   reset();
 }
@@ -24,7 +23,8 @@ void Kin7XsectionImpl::reset() {
 
   // first cross section data is always the photoabsorption cross section (no
   // dissociation)
-  int nbranch = branches.size();
+  int nbranch = options.branches.size();
+  int nspecies = options.species.size();
   int min_is = 9999, max_ie = 0;
 
   char* line = NULL;
@@ -60,9 +60,9 @@ void Kin7XsectionImpl::reset() {
     equation[60] = '\0';
     auto product = parseCompString(equation);
 
-    auto it = std::find(branches.begin(), branches.end(), product);
+    auto it = std::find(options.branches.begin(), options.branches.end(), product);
 
-    if (it == branches.end()) {
+    if (it == options.branches.end()) {
       // skip this section
       for (int i = 0; i < nrows; i++) getline(&line, &len, file);
     } else {
@@ -74,7 +74,7 @@ void Kin7XsectionImpl::reset() {
           int num = sscanf(line + 17 * j, "%7f%10f", &wave, &cross);
           TORCH_CHECK(num == 2, "Cross-section format from file '", filename,
                       "' is wrong.");
-          int b = it - branches.begin();
+          int b = it - options.branches.begin();
           int k = i * ncols + j;
 
           if (k >= nwave) break;
@@ -110,6 +110,7 @@ void Kin7XsectionImpl::reset() {
   kwave = register_buffer("kwave", torch::tensor(wavelength));
   kdata = register_buffer(
       "kdata", torch::tensor(xsection).view({wavelength.size(), nbranch}));
+  stoich = register_buffer("stoich", torch::zeros({nbranch, nspecies}));
 }
 
 torch::Tensor Kin7XsectionImpl::forward(torch::Tensor wave, torch::Tensor aflux,
@@ -139,7 +140,8 @@ torch::Tensor Kin7XsectionImpl::forward(torch::Tensor wave, torch::Tensor aflux,
           .build();
 
   if (wave.is_cpu()) {
-    call_interpn_cpu<MAX_PHOTO_BRANCHES>(iter, kdata, kwave, dims, /*ndim=*/1);
+    call_interpn_cpu<MAX_PHOTO_BRANCHES>(iter, kdata, kwave, dims,
+        /*ndim=*/1, /*nval=*/nbranch);
   } else if (wave.is_cuda()) {
     // call_interpn_cuda<MAX_PHOTO_BRANCHES>(iter, kdata, kwave, dims, 1);
   } else {
