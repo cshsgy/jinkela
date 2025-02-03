@@ -5,6 +5,9 @@
 #include <fmt/format.h>
 
 // kintera
+#include <configure.h>  // npos
+
+#include "fp_value.hpp"
 #include "get_value.hpp"
 #include "parse_comp_string.hpp"
 #include "trim_copy.hpp"

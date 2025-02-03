@@ -2,10 +2,9 @@
 #include <sstream>
 
 // fvm
-#include <utils/fp_value.hpp>
-#include <utils/vectorize.hpp>
-
 #include "reaction.hpp"
+#include "utils/fp_value.hpp"
+#include "utils/vectorize.hpp"
 
 namespace kintera {
 

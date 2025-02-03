@@ -6,7 +6,7 @@
 #include <torch/torch.h>
 
 // kintera
-#include <math/interpn.h>
+#include "interpn.h"
 
 namespace kintera {
 

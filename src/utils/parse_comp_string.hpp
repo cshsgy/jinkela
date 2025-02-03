@@ -1,10 +1,9 @@
 #pragma once
 
 // C/C++
+#include <map>
+#include <string>
 #include <vector>
-
-// kintera
-#include <reaction.hpp>
 
 //! Parse a composition string into a map consisting of individual
 //! key:composition pairs (std::map<std::string, double>).
@@ -33,6 +32,8 @@
  * \return      map of names to values
  */
 namespace kintera {
+
+using Composition = std::map<std::string, double>;
 
 Composition parse_comp_string(
     const std::string& ss,

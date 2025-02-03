@@ -7,7 +7,7 @@
 #include <torch/torch.h>
 
 // kintera
-#include <reaction.hpp>
+#include <kintera/reaction.hpp>
 
 namespace kintera {
 
@@ -87,8 +87,8 @@ std::pair<torch::Tensor, torch::Tensor> load_xsection_vulcan(
   std::vector<double> br(nbranch - 1);
 
   for (size_t i = 0; i < wavelength.size(); ++i) {
-    interpn(br.data(), &wavelength[i], bratio.data(), bwave.data(), &len, 1,
-            nbranch - 1);
+    // interpn(br.data(), &wavelength[i], bratio.data(), bwave.data(), &len, 1,
+    //         nbranch - 1);
 
     for (int j = 1; j < nbranch; ++j) {
       xsection[i * nbranch + j] *= br[j - 1];

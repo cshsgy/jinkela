@@ -12,5 +12,14 @@
 // PNetCDF output (PNETCDFOUTPUT or NO_PNETCDFOUTPUT)
 #define @PNETCDF_OPTION@
 
+// C/C++
+#include <cstdlib>
+
 constexpr char KINTERA_ROOT_DIR[] = "@CMAKE_CURRENT_SOURCE_DIR@";
 constexpr int MAX_PHOTO_BRANCHES = @MAX_PHOTO_BRANCHES@;
+
+namespace kintera {
+
+const size_t npos = static_cast<size_t>(-1);
+
+}  // namespace kintera
