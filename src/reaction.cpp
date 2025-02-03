@@ -2,7 +2,8 @@
 #include <sstream>
 
 // fvm
-#include <fvm/util/vectorize.hpp>
+#include <utils/fp_value.hpp>
+#include <utils/vectorize.hpp>
 
 #include "reaction.hpp"
 
@@ -15,16 +16,6 @@ bool starts_with(const std::string& s, const std::string& prefix) {
 bool ends_with(const std::string& s, const std::string& suffix) {
   return s.size() >= suffix.size() &&
          s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
-}
-
-double fp_value_check(const std::string& s) {
-  std::istringstream ss(s);
-  double value;
-  ss >> value;
-  if (ss.fail()) {
-    throw std::runtime_error("Error parsing floating point value");
-  }
-  return value;
 }
 
 Reaction::Reaction(const std::string& equation) {

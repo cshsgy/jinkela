@@ -28,7 +28,12 @@ string(TOUPPER ${CMAKE_BUILD_TYPE} buildu)
 set(namel kintera)
 string(TOUPPER ${namel} nameu)
 
-file(GLOB src_files *.cpp)
+file(GLOB src_files
+  *.cpp
+  math/*.cpp
+  xsection/*.cpp
+  utils/*.cpp
+  )
 
 add_library(${namel}_${buildl}
     STATIC

@@ -2,6 +2,7 @@
 
 // C/C++
 #include <map>
+#include <string>
 
 // base
 #include "add_arg.h"

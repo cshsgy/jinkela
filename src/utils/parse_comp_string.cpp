@@ -1,9 +1,13 @@
+// torch
+#include <torch/torch.h>
+
 // fmt
 #include <fmt/format.h>
 
 // kintera
 #include "get_value.hpp"
 #include "parse_comp_string.hpp"
+#include "trim_copy.hpp"
 
 namespace kintera {
 
@@ -24,7 +28,7 @@ Composition parse_comp_string(const std::string& ss,
     }
     size_t valstart = ss.find_first_not_of(" \t\n", colon + 1);
     stop = ss.find_first_of(", ;\n\t", valstart);
-    std::string name = ba::trim_copy(ss.substr(start, colon - start));
+    std::string name = trim_copy(ss.substr(start, colon - start));
     if (!names.empty() && x.find(name) == x.end()) {
       TORCH_CHECK(false, fmt::format("{} not found in names", name));
     }
@@ -58,7 +62,7 @@ Composition parse_comp_string(const std::string& ss,
   }
   TORCH_CHECK(left == start, fmt::format("Unable to parse key-value pair '{}'",
                                          ss.substr(start, stop)));
-  if (stop != npos && !ba::trim_copy(ss.substr(stop)).empty()) {
+  if (stop != npos && !trim_copy(ss.substr(stop)).empty()) {
     TORCH_CHECK(
         false,
         fmt::format("Found non-key:value data in composition string '{}'",

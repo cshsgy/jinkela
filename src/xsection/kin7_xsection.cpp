@@ -59,7 +59,7 @@ void Kin7XsectionImpl::reset() {
     int nrows = ceil(1. * nwave / ncols);
 
     equation[60] = '\0';
-    auto product = parseCompString(equation);
+    auto product = parse_comp_string(equation);
 
     auto it =
         std::find(options.branches.begin(), options.branches.end(), product);
