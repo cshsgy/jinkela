@@ -1,0 +1,10 @@
+- equation: O + H2 <=> H + OH  # Reaction 1
+  rate-constant: {A: 38.7, b: 2.7, Ea: 6260.0}
+  note: Arrhenius reversible
+- equation: H + 2 O2 => HO2 + O2 # Reaction 2
+  rate-constant: {A: 2.08e+19, b: -1.24, Ea: 0.0}
+  note: Arrhenius irreversible
+- equation: 0.7 H2 + 0.6 OH + 1.2 O2 => H2O2 + O  # Reaction 3
+  rate-constant: {A: 3.981072e+04, b: 0.0, Ea: 9.252008e+04}
+  orders: {H2: 0.8, O2: 1.0, OH: 2.0}
+  note: Arrhenius fractional reaction order

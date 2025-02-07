@@ -1,0 +1,86 @@
+- equation: O + H2 <=> H + OH  # Reaction 1
+  rate-constant: {A: 38.7, b: 2.7, Ea: 6260.0}
+  note: Arrhenius reversible
+- equation: H + 2 O2 => HO2 + O2 # Reaction 2
+  rate-constant: {A: 2.08e+19, b: -1.24, Ea: 0.0}
+  note: Arrhenius irreversible
+- equation: 0.7 H2 + 0.6 OH + 1.2 O2 => H2O2 + O  # Reaction 3
+  rate-constant: {A: 3.981072e+04, b: 0.0, Ea: 9.252008e+04}
+  orders: {H2: 0.8, O2: 1.0, OH: 2.0}
+  note: Arrhenius fractional reaction order
+- equation: H2O2 + M <=> O + H2O + M  # Reaction 4
+  type: three-body
+  rate-constant: {A: 1.2e+11, b: -1.0, Ea: 0.0}
+  efficiencies: {AR: 0.83, H2: 2.4, H2O: 15.4}
+  note: Three-body
+- equation: 2 OH (+ M) <=> H2O2 (+ M)  # Reaction 5
+  duplicate: true
+  type: falloff
+  low-P-rate-constant: {A: 2.3e+12, b: -0.9, Ea: -1700.0}
+  high-P-rate-constant: {A: 7.4e+10, b: -0.37, Ea: 0.0}
+  efficiencies: {AR: 0.7, H2: 2.0, H2O: 6.0}
+  note: Lindemann
+- equation: 2 OH (+ M) <=> H2O2 (+ M)  # Reaction 6
+  duplicate: true
+  type: falloff
+  low-P-rate-constant: {A: 2.3e+12, b: -0.9, Ea: -1700.0}
+  high-P-rate-constant: {A: 7.4e+10, b: -0.37, Ea: 0.0}
+  Troe: {A: 0.51, T3: 1.000e-30, T1: 1.000e+30}
+  efficiencies: {AR: 0.3, H2: 1.5, H2O: 2.7}
+  note: Troe 3 parameters
+- equation: 2 OH (+ M) <=> H2O2 (+ M)  # Reaction 7
+  duplicate: true
+  type: falloff
+  low-P-rate-constant: {A: 2.3e+12, b: -0.9, Ea: -1700.0}
+  high-P-rate-constant: {A: 7.4e+10, b: -0.37, Ea: 0.0}
+  Troe: {A: 0.7346, T3: 94.0, T1: 1756.0, T2: 5182.0}
+  efficiencies: {AR: 0.7, H2: 2.0, H2O: 6.0}
+  note: Troe 4 parameters
+- equation: O + H2 (+ M) <=> H + OH (+ M) # Reaction 8
+  type: falloff
+  high-P-rate-constant: {A: 1.0e+15, b: -2.0, Ea: 1000.0 cal/mol}
+  low-P-rate-constant: {A: 4.0e+19, b: -3.0, Ea: 0.0 cal/mol}
+  SRI: {A: 0.54, B: 201.0, C: 1024.0}
+  note: SRI 3 parameter
+- equation: H + HO2 (+ M) <=> H2 + O2 (+ M)  # Reaction 9
+  type: falloff
+  high-P-rate-constant: {A: 4.0e+15, b: -0.5, Ea: 100.0 cal/mol}
+  low-P-rate-constant: {A: 7.0e+20, b: -1.0, Ea: 0.0 cal/mol}
+  efficiencies: {AR: 0.7, H2: 2.0, H2O: 6.0}
+  SRI: {A: 1.1, B: 700.0, C: 1234.0, D: 56.0, E: 0.7}
+  note: SRI 5 parameter
+- equation: H2 + O2 <=> 2 OH  # Reaction 10
+  type: pressure-dependent-Arrhenius
+  rate-constants:
+  - {P: 0.01 atm, A: 1.2124e+16, b: -0.5779, Ea: 1.08727e+04}
+  - {P: 1.0 atm, A: 4.9108e+31, b: -4.8507, Ea: 2.47728e+04}
+  - {P: 10.0 atm, A: 1.2866e+47, b: -9.0246, Ea: 3.97965e+04}
+  - {P: 100.0 atm, A: 5.9632e+56, b: -11.529, Ea: 5.25996e+04}
+  note: PLOG
+- equation: O + H => O + H  # Reaction 11
+  type: pressure-dependent-Arrhenius
+  rate-constants:
+  - {P: 0.001316 atm, A: 1.23e+08, b: 1.53, Ea: 4737.0}
+  - {P: 0.039474 atm, A: 2.72e+09, b: 1.2, Ea: 6834.0}
+  - {P: 1.0 atm, A: 1.26e+20, b: -1.83, Ea: 1.5003e+04}
+  - {P: 1.0 atm, A: 1.23e+04, b: 2.68, Ea: 6335.0}
+  - {P: 10.0 atm, A: 1.68e+16, b: -0.6, Ea: 1.4754e+04}
+  - {P: 10.0 atm, A: 3.31e+08, b: 1.14, Ea: 8886.0}
+  - {P: 100.0 atm, A: 1.37e+17, b: -0.79, Ea: 1.7603e+04}
+  - {P: 100.0 atm, A: 1.28e+06, b: 1.71, Ea: 9774.0}
+  note: Multiple PLOG expressions at the same pressure
+- equation: HO2 <=> OH + O  # Reaction 12
+  type: Chebyshev
+  temperature-range: [290.0, 3000.0]
+  pressure-range: [9.869232667160128e-03 atm, 98.69232667160128 atm]
+  data:
+  - [8.2883, -1.1397, -0.12059, 0.016034]
+  - [1.9764, 1.0037, 7.2865e-03, -0.030432]
+  - [0.3177, 0.26889, 0.094806, -7.6385e-03]
+  note: Chebyshev
+- equation: H2O + OH (+M) <=> HO2 + H2 (+M)  # Reaction 13
+  units: {length: cm, quantity: mol}
+  type: chemically-activated
+  high-P-rate-constant: [5.88E-14, 6.721, -3022.227]
+  low-P-rate-constant: [282320.078, 1.46878, -3270.56495]
+  note: Chemically activated

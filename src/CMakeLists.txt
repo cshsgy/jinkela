@@ -20,6 +20,7 @@ include_directories(
   SYSTEM ${TORCH_API_INCLUDE_DIR}
   SYSTEM ${TORCH_INCLUDE_DIR}
   SYSTEM ${FMT_INCLUDE_DIR}
+  SYSTEM ${YAML_CPP_INCLUDE_DIR}
   )
 
 string(TOLOWER ${CMAKE_BUILD_TYPE} buildl)
@@ -33,6 +34,7 @@ file(GLOB src_files
   math/*.cpp
   xsection/*.cpp
   utils/*.cpp
+  kinetics/*.cpp
   )
 
 add_library(${namel}_${buildl}
