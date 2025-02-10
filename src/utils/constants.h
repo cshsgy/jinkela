@@ -25,6 +25,11 @@ using std::set;
 using std::function;
 using std::pair;
 
+// Constant indices, to be aligned with canoe
+const int IDN = 0;
+const int IPR = 1;
+const int IEN = 2;
+
 const double Pi = 3.14159265358979323846;
 const double Sqrt2 = 1.41421356237309504880;
 
