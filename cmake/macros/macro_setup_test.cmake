@@ -19,6 +19,7 @@ macro(setup_test namel)
   target_link_libraries(
     ${namel}.${buildl}
     PRIVATE kintera::kintera
+            yaml-cpp
             ${TORCH_LIBRARY}
             ${TORCH_CPU_LIBRARY}
             ${C10_LIBRARY}

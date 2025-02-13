@@ -19,6 +19,13 @@ macro(setup_problem namel)
             ${TORCH_INCLUDE_DIR} SYSTEM ${TORCH_API_INCLUDE_DIR})
 
   target_link_libraries(
-    ${namel}.${buildl} PRIVATE pydisort::disort pydisort::disort_cu
-                               ${TORCH_LIBRARIES})
+    ${namel}.${buildl}
+    PRIVATE kintera::kintera
+            yaml-cpp
+            ${TORCH_LIBRARY}
+            ${TORCH_CPU_LIBRARY}
+            ${C10_LIBRARY}
+            $<IF:$<BOOL:${CUDAToolkit_FOUND}>,kintera::kintera_cuda,>
+            $<IF:$<BOOL:${CUDAToolkit_FOUND}>,${TORCH_CUDA_LIBRARY},>
+            $<IF:$<BOOL:${CUDAToolkit_FOUND}>,${C10_CUDA_LIBRARY},>)
 endmacro()
