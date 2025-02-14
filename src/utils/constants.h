@@ -1,3 +1,5 @@
+#pragma once
+
 #include <cmath>
 
 // STL includes
@@ -67,20 +69,6 @@ const double permeability_0 = 2 * fineStructureConstant * Planck / (ElectronChar
 //! Permittivity of free space @f$ \varepsilon_0 @f$ [F/m]
 const double epsilon_0 = 1.0 / (lightSpeed * lightSpeed * permeability_0);
 
-
-//! @name Thermodynamic Equilibrium Constraints
-//!
-//! Integer numbers representing pairs of thermodynamic variables
-//! which are held constant during equilibration.
-//! @{
-
-const int TV = 100, HP = 101, SP = 102, PV = 103, TP = 104, UV = 105,
-          ST = 106, SV = 107, UP = 108, VH = 109, TH = 110, SH = 111,
-          PX = 112, TX = 113;
-const int VT = -100, PH = -101, PS = -102, VP = -103, PT = -104,
-          VU = -105, TS = -106, VS = -107, PU = -108, HV = -109,
-          HT = -110, HS = -111, XP = -112, XT = -113;
-//! @}
 
 //! smallest number to compare to zero.
 const double SmallNumber = 1.e-300;
