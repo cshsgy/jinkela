@@ -34,6 +34,7 @@ file(GLOB src_files
   math/*.cpp
   xsection/*.cpp
   utils/*.cpp
+  kinetics/*.cpp
   )
 
 add_library(${namel}_${buildl}

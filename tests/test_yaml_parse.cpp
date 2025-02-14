@@ -26,6 +26,9 @@ int main(int argc, char* argv[]) {
             for (const auto& [species, coeff] : reactions[i].reactants()) {
                 std::cout << "    " << species << ": " << coeff << "\n";
             }
+
+            std::cout << "  Rate Type: " << reactions[i].rate->type() << "\n";
+            std::cout << "  Rate Summary: " << reactions[i].rate->rateSummary() << "\n";
             
             std::cout << "  Products:\n";
             for (const auto& [species, coeff] : reactions[i].products()) {
