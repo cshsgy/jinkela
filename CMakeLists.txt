@@ -68,7 +68,9 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/parameters.cmake)
 message(STATUS "${Blue}${PROJECT_NAME}-3. Setting up system libraries ...${ColorReset}")
 include(${CMAKE_SOURCE_DIR}/cmake/fmt.cmake)
 find_package(Torch REQUIRED)
-find_package(yaml-cpp REQUIRED)
+
+include(${CMAKE_SOURCE_DIR}/cmake/yamlpp.cmake)
+
 if (CUDA)
   find_package(CUDAToolkit REQUIRED)
 else()
