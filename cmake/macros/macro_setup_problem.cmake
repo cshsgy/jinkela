@@ -25,7 +25,7 @@ macro(setup_problem namel)
             ${TORCH_LIBRARY}
             ${TORCH_CPU_LIBRARY}
             ${C10_LIBRARY}
-            $<IF:$<BOOL:${CUDAToolkit_FOUND}>,kintera::kintera_cuda,>
+            $<IF:$<BOOL:${CUDAToolkit_FOUND}>,kintera::kintera_cu,>
             $<IF:$<BOOL:${CUDAToolkit_FOUND}>,${TORCH_CUDA_LIBRARY},>
             $<IF:$<BOOL:${CUDAToolkit_FOUND}>,${C10_CUDA_LIBRARY},>)
 endmacro()

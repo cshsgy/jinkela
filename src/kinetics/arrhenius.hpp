@@ -44,7 +44,7 @@ class ArrheniusImpl : public torch::nn::Cloneable<ArrheniusImpl> {
   //! Constructor to initialize the layer
   ArrheniusImpl() = default;
   explicit ArrheniusImpl(ArrheniusOptions const& options_);
-  void reset() override;
+  void reset() override {}
   void pretty_print(std::ostream& os) const override;
 
   //! Compute the reaction rate constant

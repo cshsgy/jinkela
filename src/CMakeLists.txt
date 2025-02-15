@@ -7,6 +7,7 @@
 #
 #   KINTERA_INCLUDE_DIR
 #   kintera::kintera
+#   kintera::kintera_cu
 #
 # Normal usage would be:
 #
@@ -73,7 +74,7 @@ if (CUDAToolkit_FOUND)
       $<IF:$<BOOL:${CUDAToolkit_FOUND}>,CUDA::cudart_static,>
       )
 
-  add_library(kintera::kintera_cuda ALIAS ${namel}_cuda_${buildl})
+  add_library(kintera::kintera_cu ALIAS ${namel}_cuda_${buildl})
 endif()
 
 set(KINTERA_INCLUDE_DIR
