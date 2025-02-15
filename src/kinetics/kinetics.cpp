@@ -1,6 +1,7 @@
 #include "kinetics.h"
 #include "../utils/stoichiometry.hpp"
 #include <algorithm>
+#include <iostream>
 
 // TODO: cuda kernel acceleration with a matrix-parsed input
 namespace kintera {
@@ -20,7 +21,7 @@ void calculate_reaction_rates(
     for (int i = 0; i < n_reactions; ++i) {
         const auto& rxn = reactions[i];
         auto rateCoeff = rxn.rate->evalRate(T, P);
-        
+                
         // Calculate concentration product term
         auto conc_prod = torch::ones_like(T);
         for (const auto& [species, order] : rxn.orders()) {
