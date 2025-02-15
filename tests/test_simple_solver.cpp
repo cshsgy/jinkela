@@ -8,6 +8,7 @@
 #include "kintera/reaction.hpp"
 #include "kintera/utils/stoichiometry.hpp"
 #include "kintera/kinetics/kinetics.h"
+#include "kintera/solver/explicit.h"
 
 int main(int argc, char* argv[]) {
     try {
@@ -54,19 +55,30 @@ int main(int argc, char* argv[]) {
         kintera::Kinetics kinetics(reactions, species);
 
         // Generate random initial conditions
-        int n0 = 10;
-        torch::Tensor T = torch::rand({n0});
-        torch::Tensor P = torch::rand({n0});
-        torch::Tensor C0 = torch::rand({n0, species.size()});
+        int n0 = 3;
+        torch::Tensor T = torch::rand({n0}) * 1000.0 + 2500.0;
+        torch::Tensor P = torch::rand({n0}) * 10.0 + 1.0;
+        torch::Tensor C = torch::rand({n0, static_cast<int64_t>(species.size())}) * 1E-3;
+        
+        torch::Tensor rates = torch::zeros({n0, static_cast<int64_t>(reactions.size())});
+        torch::Tensor jacobian = torch::zeros({n0, static_cast<int64_t>(reactions.size()), static_cast<int64_t>(species.size())});
+        
+        T = T.cuda();
+        P = P.cuda();
+        C = C.cuda();
+        rates = rates.cuda();
+        jacobian = jacobian.cuda();
+        torch::Tensor S = stoich_matrix.cuda();
 
-        torch::Tensor rates = torch::zeros({n0, reactions.size()});
-        torch::Tensor jacobian = torch::zeros({n0, reactions.size(), species.size()});
-
-        kinetics.eval_rates(T, P, C0, rates);
-        kinetics.eval_jacobian(T, P, C0, jacobian);
-
-        std::cout << "Rates:\n" << rates << std::endl;
-        std::cout << "Jacobian:\n" << jacobian << std::endl;
+        int nstep = 100;
+        double dt = 1E-3;
+        
+        for (int i = 0; i < nstep; ++i) {
+            kinetics.eval_rates(T, P, C, rates);
+            kinetics.eval_jacobian(T, P, C, jacobian);
+            kintera::explicit_solve(C, rates, S, dt);
+            std::cout << "C of " << i << " step: " << C << std::endl;
+        }
 
         return 0;
         
