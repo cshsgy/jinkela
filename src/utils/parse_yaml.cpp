@@ -1,76 +1,75 @@
-#include <yaml-cpp/yaml.h>
-#include <string>
-#include <vector>
+// C/C++
+#include <cctype>
+#include <cstdlib>
 #include <stdexcept>
-#include <cctype>  
-#include <cstdlib> 
 
-#include "../reaction.hpp"
-#include "../elements.h"
-#include "../kinetics/Arrhenius.h"
-#include "../kinetics/ReactionRate.h"
+// yaml-cpp
+#include <yaml-cpp/yaml.h>
+
+// kintera
+#include <kintera/kinetics/arrhenius.hpp>
+#include <kintera/reaction.hpp>
 
 namespace kintera {
 
+std::map<Reaction, torch::nn::AnyModule> parse_reactions_yaml(
+    const std::string& filename) {
+  std::map<Reaction, torch::nn::AnyModule> reaction_rates;
 
-std::vector<Reaction> parse_reactions_yaml(const std::string& filename) {
-    std::vector<Reaction> reactions;
-    
-    YAML::Node root = YAML::LoadFile(filename);
-    printf("Loading complete\n");
-    for (const auto& rxn_node : root) {
-        std::string equation = rxn_node["equation"].as<std::string>();
-        
-        Reaction reaction(equation);
+  YAML::Node root = YAML::LoadFile(filename);
+  printf("Loading complete\n");
+  for (const auto& rxn_node : root) {
+    std::string equation = rxn_node["equation"].as<std::string>();
 
-        std::string type = "arrhenius";  // default type
-        if (rxn_node["type"]) {
-            type = rxn_node["type"].as<std::string>();
+    Reaction reaction(equation);
+
+    if (rxn_node["orders"]) {
+      const auto& orders = rxn_node["orders"];
+      for (const auto& order : orders) {
+        std::string species = order.first.as<std::string>();
+        reaction.orders()[species] = order.second.as<double>();
+      }
+    } else {
+      for (const auto& species : reaction.reactants()) {
+        reaction.orders()[species.first] = 1.0;
+      }
+      if (reaction.reversible()) {
+        for (const auto& species : reaction.products()) {
+          reaction.orders()[species.first] = 1.0;
         }
-
-        // TODO: Implement the support of other reaction types
-        if (type == "arrhenius") {
-            reaction.rate = std::make_unique<ArrheniusRate>(rxn_node["rate-constant"]);
-        }else if (type == "three-body") {
-            printf("Three-body reaction not implemented\n");
-            continue;
-        }else if (type == "falloff") {
-            printf("Falloff reaction not implemented\n");
-            continue;
-        }else{
-            printf("Unknown reaction type: %s\n", type.c_str());
-            continue;
-        }
-
-        if (rxn_node["orders"]) {
-            const auto& orders = rxn_node["orders"];
-            for (const auto& order : orders) {
-                std::string species = order.first.as<std::string>();
-                reaction.orders()[species] = order.second.as<double>();
-            }
-        } else {
-            for (const auto& species : reaction.reactants()) {
-                reaction.orders()[species.first] = 1.0;
-            }
-            if (reaction.reversible()) {
-                for (const auto& species : reaction.products()) {
-                    reaction.orders()[species.first] = 1.0;
-                }
-            }
-        }
-
-        // if (rxn_node["efficiencies"]) {
-        //     const auto& effs = rxn_node["efficiencies"];
-        //     for (const auto& eff : effs) {
-        //         std::string species = eff.first.as<std::string>();
-        //         double value = eff.second.as<double>();
-        //     }
-        // }
-
-        reactions.push_back(std::move(reaction));
+      }
     }
 
-    return reactions;
+    // if (rxn_node["efficiencies"]) {
+    //     const auto& effs = rxn_node["efficiencies"];
+    //     for (const auto& eff : effs) {
+    //         std::string species = eff.first.as<std::string>();
+    //         double value = eff.second.as<double>();
+    //     }
+    // }
+
+    std::string type = "arrhenius";  // default type
+    if (rxn_node["type"]) {
+      type = rxn_node["type"].as<std::string>();
+    }
+
+    // TODO: Implement the support of other reaction types
+    if (type == "arrhenius") {
+      auto op = ArrheniusOptions::from_yaml(rxn_node["rate-constant"]);
+      reaction_rates[reaction] = torch::nn::AnyModule(Arrhenius(op));
+    } else if (type == "three-body") {
+      printf("Three-body reaction not implemented\n");
+      continue;
+    } else if (type == "falloff") {
+      printf("Falloff reaction not implemented\n");
+      continue;
+    } else {
+      printf("Unknown reaction type: %s\n", type.c_str());
+      continue;
+    }
+  }
+
+  return reaction_rates;
 }
 
-} // namespace kintera
+}  // namespace kintera
