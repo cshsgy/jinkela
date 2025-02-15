@@ -3,34 +3,23 @@
 #include <cmath>
 
 // STL includes
+#include <algorithm>
 #include <cstdlib>
-#include <vector>
+#include <functional>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
-#include <algorithm>
-#include <memory>
-#include <functional>
+#include <vector>
 
-namespace kintera
-{
-
-using std::shared_ptr;
-using std::make_shared;
-using std::unique_ptr;
-using std::make_unique;
-using std::isnan; // workaround for bug in libstdc++ 4.8
-using std::string;
-using std::vector;
-using std::map;
-using std::set;
-using std::function;
-using std::pair;
+namespace kintera {
 
 // Constant indices, to be aligned with canoe
 const int IDN = 0;
 const int IPR = 1;
 const int IEN = 2;
+
+namespace constants {
 
 const double Pi = 3.14159265358979323846;
 const double Sqrt2 = 1.41421356237309504880;
@@ -61,14 +50,16 @@ const double logGasConstant = std::log(GasConstant);
 //! Universal gas constant in cal/mol/K
 const double GasConst_cal_mol_K = GasConstant / 4184.0;
 //! Stefan-Boltzmann constant @f$ \sigma @f$ [W/m2/K4]
-const double StefanBoltz = 2.0 * std::pow(Pi, 5) * std::pow(Boltzmann, 4) / (15.0 * std::pow(Planck, 3) * lightSpeed * lightSpeed); // 5.670374419e-8
+const double StefanBoltz =
+    2.0 * std::pow(Pi, 5) * std::pow(Boltzmann, 4) /
+    (15.0 * std::pow(Planck, 3) * lightSpeed * lightSpeed);  // 5.670374419e-8
 //! Faraday constant @f$ F @f$ [C/kmol]
 const double Faraday = ElectronCharge * Avogadro;
 //! Permeability of free space @f$ \mu_0 @f$ [N/A2]
-const double permeability_0 = 2 * fineStructureConstant * Planck / (ElectronCharge * ElectronCharge * lightSpeed);
+const double permeability_0 = 2 * fineStructureConstant * Planck /
+                              (ElectronCharge * ElectronCharge * lightSpeed);
 //! Permittivity of free space @f$ \varepsilon_0 @f$ [F/m]
 const double epsilon_0 = 1.0 / (lightSpeed * lightSpeed * permeability_0);
-
 
 //! smallest number to compare to zero.
 const double SmallNumber = 1.e-300;
@@ -88,6 +79,8 @@ const double Undef = -999.1234;
  */
 const double Tiny = 1.e-20;
 
+}  // namespace constants
+
 //! Map from string names to doubles. Used for defining species mole/mass
 //! fractions, elemental compositions, and reaction stoichiometries.
 typedef std::map<std::string, double> Composition;
@@ -95,4 +88,4 @@ typedef std::map<std::string, double> Composition;
 //! index returned by functions to indicate "no position"
 const size_t npos = static_cast<size_t>(-1);
 
-} // namespace
+}  // namespace kintera

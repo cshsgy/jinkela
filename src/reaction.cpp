@@ -1,12 +1,27 @@
 // C/C++
 #include <sstream>
 
-// fvm
+// kintera
 #include "reaction.hpp"
+#include "utils/constants.hpp"
 #include "utils/fp_value.hpp"
 #include "utils/vectorize.hpp"
 
 namespace kintera {
+
+bool operator==(Reaction const& lhs, Reaction const& rhs) {
+  return lhs.reactants() == rhs.reactants() && lhs.products() == rhs.products();
+}
+
+bool operator<(Reaction const& lhs, Reaction const& rhs) {
+  if (lhs.reactants() < rhs.reactants()) {
+    return true;
+  } else if (lhs.reactants() == rhs.reactants()) {
+    return lhs.products() < rhs.products();
+  } else {
+    return false;
+  }
+}
 
 bool starts_with(const std::string& s, const std::string& prefix) {
   return s.compare(0, prefix.size(), prefix) == 0;
@@ -22,9 +37,6 @@ Reaction::Reaction(const std::string& equation) {
   // stoichiometric coefficients
   auto tokens = Vectorize<std::string>(equation.c_str(), " ");
   tokens.push_back("+");  // makes parsing last species not a special case
-
-  //! index returned by functions to indicate "no position"
-  const auto npos = static_cast<size_t>(-1);
 
   size_t last_used = npos;  // index of last-used token
   bool is_reactants = true;

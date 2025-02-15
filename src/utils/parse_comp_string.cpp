@@ -5,8 +5,7 @@
 #include <fmt/format.h>
 
 // kintera
-#include <configure.h>  // npos
-
+#include "constants.hpp"
 #include "fp_value.hpp"
 #include "get_value.hpp"
 #include "parse_comp_string.hpp"

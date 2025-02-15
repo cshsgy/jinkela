@@ -3,8 +3,8 @@
 #include <vector>
 
 // kintera
-#include "kintera/elements.h"
-#include "utils/constants.h"
+#include "elements.hpp"
+#include "utils/constants.hpp"
 #include "utils/to_lower_copy.hpp"
 #include "utils/trim_copy.hpp"
 
@@ -185,7 +185,7 @@ static std::vector<IsotopeWeightData> IsotopeWeightTable{
     // doi:10.1088/1674-1137/41/3/030003.
     {"D", "deuterium", 2.0141017781, 1},
     {"Tr", "tritium", 3.0160492820, 1},
-    {"E", "electron", ElectronMass* Avogadro, 0},
+    {"E", "electron", constants::ElectronMass* constants::Avogadro, 0},
 };
 
 // This is implemented as a separate function from elementSymbols() because this
