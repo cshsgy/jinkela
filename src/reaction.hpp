@@ -18,6 +18,25 @@ using Composition = std::map<std::string, double>;
 struct Reaction {
   Reaction() = default;
   explicit Reaction(const std::string& equation);
+
+  Reaction(const Reaction& other)
+    : rate(other.rate ? other.rate->clone() : nullptr),
+      reactants_(other.reactants_),
+      products_(other.products_),
+      orders_(other.orders_),
+      reversible_(other.reversible_) {}
+  
+  Reaction& operator=(const Reaction& other) {
+    if (this != &other) {
+      rate = other.rate ? other.rate->clone() : nullptr;
+      reactants_ = other.reactants_;
+      products_ = other.products_;
+      orders_ = other.orders_;
+      reversible_ = other.reversible_;
+    }
+    return *this;
+  }
+
   std::unique_ptr<ReactionRate> rate;
 
   //! The chemical equation for this reaction

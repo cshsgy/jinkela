@@ -28,6 +28,10 @@ public:
         return "Arrhenius";
     }
     
+    std::unique_ptr<ReactionRate> clone() const override {
+        return std::make_unique<ArrheniusRate>(*this);
+    }
+    
     double order() const {
         return m_order;
     }
