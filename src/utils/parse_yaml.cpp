@@ -42,29 +42,31 @@ std::vector<Reaction> parse_reactions_yaml(const std::string& filename) {
             continue;
         }
 
-        if (rxn_node["efficiencies"]) {
-            const auto& effs = rxn_node["efficiencies"];
-            for (const auto& eff : effs) {
-                std::string species = eff.first.as<std::string>();
-                double value = eff.second.as<double>();
-            }
-        }
-
         if (rxn_node["orders"]) {
             const auto& orders = rxn_node["orders"];
             for (const auto& order : orders) {
                 std::string species = order.first.as<std::string>();
-                double value = order.second.as<double>();
+                reaction.orders()[species] = order.second.as<double>();
+            }
+        } else {
+            for (const auto& species : reaction.reactants()) {
+                reaction.orders()[species.first] = 1.0;
+            }
+            if (reaction.reversible()) {
+                for (const auto& species : reaction.products()) {
+                    reaction.orders()[species.first] = 1.0;
+                }
             }
         }
 
-        if (rxn_node["Troe"]) {
-            const auto& troe = rxn_node["Troe"];
-        }
+        // if (rxn_node["efficiencies"]) {
+        //     const auto& effs = rxn_node["efficiencies"];
+        //     for (const auto& eff : effs) {
+        //         std::string species = eff.first.as<std::string>();
+        //         double value = eff.second.as<double>();
+        //     }
+        // }
 
-        if (rxn_node["SRI"]) {
-            const auto& sri = rxn_node["SRI"];
-        }
         reactions.push_back(std::move(reaction));
     }
 

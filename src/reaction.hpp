@@ -29,6 +29,9 @@ struct Reaction {
   //! Product species and stoichiometric coefficients
   ADD_ARG(Composition, products);
 
+  //! Reaction orders
+  ADD_ARG(Composition, orders);
+
   ADD_ARG(bool, reversible) = false;
 };
 
