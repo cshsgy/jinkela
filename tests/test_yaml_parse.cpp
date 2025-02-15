@@ -23,6 +23,9 @@ int main(int argc, char* argv[]) {
     std::cout << "Successfully parsed " << reactions.size()
               << " reactions:\n\n";
 
+    auto temp = torch::ones({2, 3}, torch::kFloat64) * 300.;
+    auto pres = torch::ones({2, 3}, torch::kFloat64) * 101325.;
+
     for (auto& [reaction, rate] : reactions) {
       std::cout << "  Equation: " << reaction.equation() << "\n";
 
@@ -30,6 +33,9 @@ int main(int argc, char* argv[]) {
       for (const auto& [species, coeff] : reaction.reactants()) {
         std::cout << "    " << species << ": " << coeff << "\n";
       }
+
+      auto rc = rate.forward(temp, pres);
+      std::cout << "rate at 300 K = " << rc << "\n";
 
       /*std::cout << "  Rate Type: " << rate.name() << "\n";
       std::stringstream ss;

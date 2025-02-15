@@ -53,8 +53,7 @@ class ArrheniusImpl : public torch::nn::Cloneable<ArrheniusImpl> {
    * \param P pressure [Pa]
    * \return reaction rate constant in (kmol, m, s)
    */
-  torch::Tensor forward(torch::Tensor T,
-                        torch::optional<torch::Tensor> P = torch::nullopt);
+  torch::Tensor forward(torch::Tensor T, torch::Tensor P);
 };
 TORCH_MODULE(Arrhenius);
 

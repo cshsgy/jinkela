@@ -40,8 +40,7 @@ void ArrheniusImpl::pretty_print(std::ostream& os) const {
      << ", Ea = " << options.Ea_R() * constants::GasConstant << " J/kmol";
 }
 
-torch::Tensor ArrheniusImpl::forward(torch::Tensor T,
-                                     torch::optional<torch::Tensor> P) {
+torch::Tensor ArrheniusImpl::forward(torch::Tensor T, torch::Tensor P) {
   return options.A() * (options.b() * T.log() - options.Ea_R() * 1.0 / T).exp();
 }
 
