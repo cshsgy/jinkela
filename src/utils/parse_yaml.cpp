@@ -50,11 +50,12 @@ std::vector<Reaction> parse_reactions_yaml(const std::string& filename) {
             }
         } else {
             for (const auto& species : reaction.reactants()) {
-                reaction.orders()[species.first] = 1.0;
+                reaction.orders()[species.first] = reaction.reactants()[species.first];
             }
             if (reaction.reversible()) {
                 for (const auto& species : reaction.products()) {
-                    reaction.orders()[species.first] = 1.0;
+                    // Negative order for products
+                    reaction.orders()[species.first] = -reaction.products()[species.first];
                 }
             }
         }
