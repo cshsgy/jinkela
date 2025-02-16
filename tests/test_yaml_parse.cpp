@@ -6,6 +6,7 @@
 #include <vector>
 
 // kintera
+#include "kintera/kinetics/kinetics_formatter.hpp"
 #include "kintera/kintera_formatter.hpp"
 #include "kintera/reaction.hpp"
 #include "kintera/utils/parse_yaml.hpp"
@@ -28,9 +29,11 @@ int main(int argc, char* argv[]) {
     auto pres = torch::ones({2, 3}, torch::kFloat64) * 101325.;
 
     for (auto& [reaction, rate] : reactions) {
-      std::cout << "  Equation: " << reaction << "\n";
-      std::cout << "  Reactants: " << reaction.reactants() << "\n";
-      std::cout << "  Products: " << reaction.products() << "\n";
+      std::cout << "Equation: " << fmt::format("{}", reaction) << std::endl;
+      std::cout << "Reactants: " << fmt::format("{}", reaction.reactants())
+                << std::endl;
+      std::cout << "Products: " << fmt::format("{}", reaction.products())
+                << std::endl;
 
       auto rc = rate.forward(temp, pres);
       std::cout << "rate at 300 K = " << rc << "\n";
@@ -40,12 +43,7 @@ int main(int argc, char* argv[]) {
       rate.pretty_print(ss);
       std::cout << "  Rate Summary: " << ss.str() << "\n";*/
 
-      std::cout << "  Products:\n";
-      for (const auto& [species, coeff] : reaction.products()) {
-        std::cout << "    " << species << ": " << coeff << "\n";
-      }
-
-      std::cout << "  Reversible: " << (reaction.reversible() ? "yes" : "no")
+      std::cout << "Reversible: " << (reaction.reversible() ? "yes" : "no")
                 << "\n\n";
     }
 
