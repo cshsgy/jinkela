@@ -35,7 +35,6 @@ file(GLOB src_files
   xsection/*.cpp
   utils/*.cpp
   kinetics/*.cpp
-  solver/*.cpp
   )
 
 add_library(${namel}_${buildl}

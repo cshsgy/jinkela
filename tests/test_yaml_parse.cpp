@@ -38,6 +38,8 @@ int main(int argc, char* argv[]) {
                 << std::endl;
       std::cout << "Products: " << fmt::format("{}", reaction.products())
                 << std::endl;
+      std::cout << "Orders: " << fmt::format("{}", reaction.orders())
+                << std::endl;
 
       auto rc = rate.forward(temp, pres);
       std::cout << "rate at 300 K = " << rc << "\n";
@@ -50,9 +52,6 @@ int main(int argc, char* argv[]) {
                 << torch::autograd::grad({rc}, {temp}, {torch::ones_like(rc)},
                                          true, true)[0]
                 << "\n";
-
-      /*rc.backward(torch::ones_like(rc), true, true);
-      std::cout << "rate derivative = " << temp.grad() << "\n";*/
 
       /*std::cout << "  Rate Type: " << rate.name() << "\n";
       std::stringstream ss;
