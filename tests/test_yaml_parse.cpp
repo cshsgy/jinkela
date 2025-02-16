@@ -5,6 +5,9 @@
 #include <string>
 #include <vector>
 
+// torch
+#include <torch/torch.h>
+
 // kintera
 #include "kintera/kinetics/kinetics_formatter.hpp"
 #include "kintera/kintera_formatter.hpp"
@@ -25,7 +28,8 @@ int main(int argc, char* argv[]) {
     std::cout << "Successfully parsed " << reactions.size()
               << " reactions:\n\n";
 
-    auto temp = torch::ones({2, 3}, torch::kFloat64) * 300.;
+    auto temp =
+        300. * torch::ones({2, 3}, torch::kFloat64).requires_grad_(true);
     auto pres = torch::ones({2, 3}, torch::kFloat64) * 101325.;
 
     for (auto& [reaction, rate] : reactions) {
@@ -37,6 +41,18 @@ int main(int argc, char* argv[]) {
 
       auto rc = rate.forward(temp, pres);
       std::cout << "rate at 300 K = " << rc << "\n";
+
+      // check out these articles on autograd
+      // https://pytorch.org/tutorials/advanced/cpp_autograd.html
+      // https://pytorch.org/cppdocs/api/function_namespacetorch_1_1autograd_1ab9fa15dc09a8891c26525fb61d33401a.html
+
+      std::cout << "Rate derivative = "
+                << torch::autograd::grad({rc}, {temp}, {torch::ones_like(rc)},
+                                         true, true)[0]
+                << "\n";
+
+      /*rc.backward(torch::ones_like(rc), true, true);
+      std::cout << "rate derivative = " << temp.grad() << "\n";*/
 
       /*std::cout << "  Rate Type: " << rate.name() << "\n";
       std::stringstream ss;
