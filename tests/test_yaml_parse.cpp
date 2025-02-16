@@ -6,6 +6,7 @@
 #include <vector>
 
 // kintera
+#include "kintera/kintera_formatter.hpp"
 #include "kintera/reaction.hpp"
 #include "kintera/utils/parse_yaml.hpp"
 #include "kintera/utils/stoichiometry.hpp"
@@ -27,12 +28,9 @@ int main(int argc, char* argv[]) {
     auto pres = torch::ones({2, 3}, torch::kFloat64) * 101325.;
 
     for (auto& [reaction, rate] : reactions) {
-      std::cout << "  Equation: " << reaction.equation() << "\n";
-
-      std::cout << "  Reactants:\n";
-      for (const auto& [species, coeff] : reaction.reactants()) {
-        std::cout << "    " << species << ": " << coeff << "\n";
-      }
+      std::cout << "  Equation: " << reaction << "\n";
+      std::cout << "  Reactants: " << reaction.reactants() << "\n";
+      std::cout << "  Products: " << reaction.products() << "\n";
 
       auto rc = rate.forward(temp, pres);
       std::cout << "rate at 300 K = " << rc << "\n";
