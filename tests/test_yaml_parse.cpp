@@ -5,7 +5,12 @@
 #include <string>
 #include <vector>
 
+// torch
+#include <torch/torch.h>
+
 // kintera
+#include "kintera/kinetics/kinetics_formatter.hpp"
+#include "kintera/kintera_formatter.hpp"
 #include "kintera/reaction.hpp"
 #include "kintera/utils/parse_yaml.hpp"
 #include "kintera/utils/stoichiometry.hpp"
@@ -23,31 +28,38 @@ int main(int argc, char* argv[]) {
     std::cout << "Successfully parsed " << reactions.size()
               << " reactions:\n\n";
 
-    auto temp = torch::ones({2, 3}, torch::kFloat64) * 300.;
+    auto temp =
+        300. * torch::ones({2, 3}, torch::kFloat64).requires_grad_(true);
     auto pres = torch::ones({2, 3}, torch::kFloat64) * 101325.;
 
     for (auto& [reaction, rate] : reactions) {
-      std::cout << "  Equation: " << reaction.equation() << "\n";
-
-      std::cout << "  Reactants:\n";
-      for (const auto& [species, coeff] : reaction.reactants()) {
-        std::cout << "    " << species << ": " << coeff << "\n";
-      }
+      std::cout << "Equation: " << fmt::format("{}", reaction) << std::endl;
+      std::cout << "Reactants: " << fmt::format("{}", reaction.reactants())
+                << std::endl;
+      std::cout << "Products: " << fmt::format("{}", reaction.products())
+                << std::endl;
 
       auto rc = rate.forward(temp, pres);
       std::cout << "rate at 300 K = " << rc << "\n";
+
+      // check out these articles on autograd
+      // https://pytorch.org/tutorials/advanced/cpp_autograd.html
+      // https://pytorch.org/cppdocs/api/function_namespacetorch_1_1autograd_1ab9fa15dc09a8891c26525fb61d33401a.html
+
+      std::cout << "Rate derivative = "
+                << torch::autograd::grad({rc}, {temp}, {torch::ones_like(rc)},
+                                         true, true)[0]
+                << "\n";
+
+      /*rc.backward(torch::ones_like(rc), true, true);
+      std::cout << "rate derivative = " << temp.grad() << "\n";*/
 
       /*std::cout << "  Rate Type: " << rate.name() << "\n";
       std::stringstream ss;
       rate.pretty_print(ss);
       std::cout << "  Rate Summary: " << ss.str() << "\n";*/
 
-      std::cout << "  Products:\n";
-      for (const auto& [species, coeff] : reaction.products()) {
-        std::cout << "    " << species << ": " << coeff << "\n";
-      }
-
-      std::cout << "  Reversible: " << (reaction.reversible() ? "yes" : "no")
+      std::cout << "Reversible: " << (reaction.reversible() ? "yes" : "no")
                 << "\n\n";
     }
 
