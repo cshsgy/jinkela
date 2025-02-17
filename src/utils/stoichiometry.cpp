@@ -11,7 +11,8 @@ torch::Tensor generate_stoichiometry_matrix(
     const std::map<Reaction, torch::nn::AnyModule>& reactions,
     const std::vector<std::string>& species) {
   auto matrix = torch::zeros(
-      {static_cast<long>(reactions.size()), static_cast<long>(species.size())});
+      {static_cast<long>(reactions.size()), static_cast<long>(species.size())},
+      torch::kFloat64);
 
   for (auto it = reactions.begin(); it != reactions.end(); ++it) {
     size_t i = std::distance(reactions.begin(), it);

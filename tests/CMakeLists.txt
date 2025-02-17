@@ -3,6 +3,7 @@
 # ===============================================
 
 setup_problem(test_yaml_parse)
+setup_problem(test_kinetics_rates)
 
 file(GLOB inputs *.inp *.dat *.yaml)
 foreach(input ${inputs})
