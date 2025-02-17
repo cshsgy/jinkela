@@ -56,13 +56,7 @@ int main(int argc, char* argv[]) {
     auto temp = 300. * torch::ones({n1, n2}, torch::kFloat64).requires_grad_(true);
     auto pres = torch::ones({n1, n2}, torch::kFloat64) * 101325.;
     auto conc = 1e-3 * torch::ones({n0, n1, n2}, torch::kFloat64).requires_grad_(true);
-
-    // Print test conditions
-    std::cout << "Test conditions:\n";
-    std::cout << "Temperature: " << temp << "\n";
-    std::cout << "Pressure: " << pres << "\n";
-    std::cout << "Concentration: " << conc << "\n\n";
-
+    
     // Calculate species rates of change
     auto dcdt = kinetics->forward(temp, pres, conc);
     std::cout << "Species rates of change:\n";
@@ -78,8 +72,7 @@ int main(int argc, char* argv[]) {
       grad_outputs.index_put_({i}, 1.0);
       
       auto grads = torch::autograd::grad({dcdt}, {conc}, {grad_outputs}, 
-                                       /*retain_graph=*/true, 
-                                       /*create_graph=*/true);
+                                       true, true);
       // At {i, j} is the gradient of spec i with respect to spec j
       jac.index_put_({i}, grads[0]);
     }
