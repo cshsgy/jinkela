@@ -6,10 +6,6 @@
 
 // kinetra
 #include "add_arg.h"
-
-// torch
-#include <torch/torch.h>
-
 namespace kintera {
 
 using Composition = std::map<std::string, double>;
@@ -17,22 +13,6 @@ using Composition = std::map<std::string, double>;
 struct Reaction {
   Reaction() = default;
   explicit Reaction(const std::string& equation);
-
-  Reaction(const Reaction& other)
-    : reactants_(other.reactants_),
-      products_(other.products_),
-      orders_(other.orders_),
-      reversible_(other.reversible_) {}
-  
-  Reaction& operator=(const Reaction& other) {
-    if (this != &other) {
-      reactants_ = other.reactants_;
-      products_ = other.products_;
-      orders_ = other.orders_;
-      reversible_ = other.reversible_;
-    }
-    return *this;
-  }
 
   //! The chemical equation for this reaction
   std::string equation() const;
