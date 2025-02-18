@@ -6,7 +6,6 @@
 
 // kinetra
 #include "add_arg.h"
-
 namespace kintera {
 
 using Composition = std::map<std::string, double>;
