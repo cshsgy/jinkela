@@ -35,46 +35,6 @@ bool PhotolysisData::update(const ThermoPhase& thermo, const Kinetics& kin) {
   return changed;
 }
 
-bool PhotolysisData::check() const {
-  // Check that the wavelength grid is valid
-  if (wavelength.size() < 2) {
-    throw CanteraError("PhotolysisData::update",
-                       "Wavelength grid must have at least two points.");
-  }
-
-  if (wavelength[0] <= 0.0) {
-    throw CanteraError("PhotolysisData::update",
-                       "Wavelength grid must be positive.");
-  }
-
-  for (size_t i = 1; i < wavelength.size(); i++) {
-    if (wavelength[i] <= wavelength[i - 1]) {
-      throw CanteraError("PhotolysisData::update",
-                         "Wavelength grid must be strictly increasing.");
-    }
-  }
-
-  // Check that the actinic flux is valid
-  if (actinicFlux.empty()) {
-    throw CanteraError("PhotolysisData::update", "Actinic flux is empty.");
-  }
-
-  if (actinicFlux.size() != wavelength.size()) {
-    throw CanteraError(
-        "PhotolysisData::update",
-        "Actinic flux must have the same size as the wavelength grid.");
-  }
-
-  for (size_t i = 0; i < actinicFlux.size(); i++) {
-    if (actinicFlux[i] < 0.0) {
-      throw CanteraError("PhotolysisData::update",
-                         "Actinic flux must be non-negative.");
-    }
-  }
-
-  return true;
-}
-
 PhotolysisBase::PhotolysisBase(vector<double> const& temp,
                                vector<double> const& wavelength,
                                vector<std::string> const& branches,
@@ -104,11 +64,6 @@ PhotolysisBase::PhotolysisBase(vector<double> const& temp,
   }
 
   m_valid = true;
-}
-
-PhotolysisBase::PhotolysisBase(AnyMap const& node,
-                               UnitStack const& rate_units) {
-  setParameters(node, rate_units);
 }
 
 void PhotolysisBase::setRateParameters(AnyValue const& rate,
@@ -266,33 +221,6 @@ void PhotolysisBase::setParameters(AnyMap const& node,
   m_valid = true;
 }
 
-void PhotolysisBase::getRateParameters(AnyMap& node) const {
-  node.setFlowStyle();
-}
-
-void PhotolysisBase::getParameters(AnyMap& node) const {
-  AnyMap rateNode;
-  getRateParameters(rateNode);
-
-  if (!rateNode.empty()) {
-    node["rate-constant"] = std::move(rateNode);
-  }
-}
-
-void PhotolysisBase::check(string const& equation) {
-  if (m_ntemp < 2) {
-    throw InputFileError(
-        "PhotolysisBase::check", m_input,
-        "Insufficient temperature data provided for reaction '{}'.", equation);
-  }
-
-  // should change later
-  if (m_nwave < 0) {
-    throw InputFileError("PhotolysisBase::check", m_input,
-                         "No wavelength data provided for reaction '{}'.",
-                         equation);
-  }
-}
 
 void PhotolysisBase::validate(string const& equation, Kinetics const& kin) {
   if (!valid()) {

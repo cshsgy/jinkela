@@ -1,10 +1,13 @@
 #pragma once
 
-#include "MultiRate.h"
-#include "ReactionRate.h"
-#include "cantera/base/Units.h"
-#include "cantera/base/ct_defs.h"
-#include "cantera/kinetics/ReactionData.h"
+// torch
+#include <torch/torch.h>
+
+// yaml
+#include <yaml-cpp/yaml.h>
+
+// kintera
+#include <kintera/add_arg.h>
 
 namespace kintera {
 
@@ -12,37 +15,30 @@ int locate(double const* xx, double x, int n);
 void interpn(double* val, double const* coor, double const* data,
              double const* axis, size_t const* len, int ndim, int nval);
 
-class ThermoPhase;
-class Kinetics;
-
-//! Data container holding shared data specific to photolysis reactions
-/**
- * The data container `PhotolysisData` holds photolysis cross-section data
- * @ingroup reactionGroup
- */
-struct PhotolysisData : public ReactionData {
-  bool check() const;
-
-  bool update(const ThermoPhase& thermo, const Kinetics& kin) override;
-  using ReactionData::update;
+struct PhotolysisOptions {
+  static PhotolysisOptions from_yaml(const YAML::Node& node);
 
   //! \brief wavelength grid
   //!
   //! The wavelength grid is a vector of size nwave.
   //! Default units are nanometers.
-  torch::Tensor wavelength;
+  ADD_ARG(torch::Tensor, wavelength);
 
   //! \brief actinic flux
   //!
   //! The actinic flux is a vector of size nwave.
   //! Default units are photons cm^-2 s^-1 nm^-1.
-  torch::Tensor actinicFlux;
+  ADD_ARG(torch::Tensor, actinicFlux);
+
+  //! \brief temperature grid
 };
 
-class PhotolysisBase : public ReactionRate {
+class PhotolysisImpl : public torch::nn::Cloneable<PhotolysisImpl> {
  public:
-  //! Default constructor
-  PhotolysisBase() {}
+  PhotolysisOptions options;
+  PhotolysisImpl() = default;
+  explicit PhotolysisImpl(PhotolysisOptions const& options_);
+  void reset() override;
 
   //! Constructor.
   /*!
