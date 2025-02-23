@@ -24,7 +24,7 @@ void RateConstantImpl::reset() {
     rxn_id_start.push_back(current_id);
 
     // TODO: Implement the support of other reaction types
-    if (type == "arrhenius") {
+    if (type == "Arrhenius") {
       auto op = ArrheniusOptions::from_yaml(root);
       eval_rate_constants.push_back(torch::nn::AnyModule(Arrhenius(op)));
       nreaction = op.A().size();

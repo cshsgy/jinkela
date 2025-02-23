@@ -7,5 +7,5 @@ setup_problem(test_kinetics_rates)
 
 file(GLOB inputs *.inp *.dat *.yaml)
 foreach(input ${inputs})
-    file(COPY ${input} DESTINATION ${CMAKE_BINARY_DIR}/bin)
+  execute_process(COMMAND ln -sf ${input} ${CMAKE_BINARY_DIR}/bin/${inp})
 endforeach()

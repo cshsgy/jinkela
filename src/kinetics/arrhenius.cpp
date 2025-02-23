@@ -16,7 +16,7 @@ ArrheniusOptions ArrheniusOptions::from_yaml(const YAML::Node& root) {
       TORCH_CHECK(false, "Reaction type not specified");
     }
 
-    if (rxn_node["type"].as<std::string>() != "arrhenius") {
+    if (rxn_node["type"].as<std::string>() != "Arrhenius") {
       continue;
     }
 

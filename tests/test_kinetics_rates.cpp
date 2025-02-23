@@ -28,7 +28,7 @@ int main(int argc, char* argv[]) {
 
     // rate constant
     auto rop = kintera::RateConstantOptions();
-    rop.types({"arrhenius"});
+    rop.types({"Arrhenius"});
     rop.reaction_file(yaml_file.string());
 
     auto rate_constant = kintera::RateConstant(rop);
