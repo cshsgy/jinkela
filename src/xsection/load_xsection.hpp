@@ -1,5 +1,18 @@
 #pragma once
 
+// torch
+#include <torch/torch.h>
+
+// kintera
+#include <kintera/utils/parse_comp_string.hpp>
+#include "kin7_xsection.hpp"
+#include "vulcan_xsection.hpp"
+
+// C++
+#include <string>
+#include <vector>
+#include <map>
+
 namespace kintera {
 
 /**

@@ -1,155 +1,165 @@
-//! @file Photolysis.cpp
+// kintera
+#include "photolysis.hpp"
+#include "reaction.hpp"
+#include "utils/parse_comp_string.hpp"
 
-#include "cantera/kinetics/Photolysis.h"
+// torch
+#include <torch/torch.h>
 
-#include "cantera/base/stringUtils.h"
-#include "cantera/kinetics/Kinetics.h"
-#include "cantera/kinetics/Reaction.h"
-#include "cantera/kinetics/ReactionRateFactory.h"
-#include "cantera/thermo/ThermoPhase.h"
+// C++
+#include <string>
+#include <vector>
+#include <map>
 
-namespace Cantera {
+// yaml-cpp
+#include <yaml-cpp/yaml.h>
 
-bool PhotolysisData::update(const ThermoPhase& thermo, const Kinetics& kin) {
-  bool changed = false;
-  double T = thermo.temperature();
-  if (T != temperature) {
-    update(T);
-    changed = true;
-  }
+namespace kintera {
 
-  if (wavelength.empty()) {
-    size_t nwave = kin.nWavelengths();
+// bool PhotolysisData::update(const ThermoPhase& thermo, const Kinetics& kin) {
+//   bool changed = false;
+//   double T = thermo.temperature();
+//   if (T != temperature) {
+//     update(T);
+//     changed = true;
+//   }
 
-    wavelength.resize(nwave);
-    actinicFlux.resize(nwave);
+//   if (wavelength.empty()) {
+//     size_t nwave = kin.nWavelengths();
 
-    kin.getWavelength(wavelength.data());
-    kin.getActinicFlux(actinicFlux.data());
-    changed = true;
-  } else if (kin.hasNewActinicFlux()) {
-    kin.getActinicFlux(actinicFlux.data());
-    changed = true;
-  }
+//     wavelength.resize(nwave);
+//     actinicFlux.resize(nwave);
 
-  return changed;
-}
+//     kin.getWavelength(wavelength.data());
+//     kin.getActinicFlux(actinicFlux.data());
+//     changed = true;
+//   } else if (kin.hasNewActinicFlux()) {
+//     kin.getActinicFlux(actinicFlux.data());
+//     changed = true;
+//   }
 
-PhotolysisBase::PhotolysisBase(vector<double> const& temp,
-                               vector<double> const& wavelength,
-                               vector<std::string> const& branches,
-                               vector<double> const& xsection)
-    : m_crossSection(xsection) {
-  m_ntemp = temp.size();
-  m_nwave = wavelength.size();
+//   return changed;
+// }
 
-  m_temp_wave_grid.resize(m_ntemp + m_nwave);
-  for (size_t i = 0; i < m_ntemp; i++) {
-    m_temp_wave_grid[i] = temp[i];
-  }
+// PhotolysisBase::PhotolysisBase(torch::Tensor temp,
+//                                torch::Tensor wavelength,
+//                                const std::vector<std::string>& branches,
+//                                torch::Tensor xsection)
+//     : m_crossSection(xsection) {
+//   m_ntemp = temp.size();
+//   m_nwave = wavelength.size();
 
-  for (size_t i = 0; i < m_nwave; i++) {
-    m_temp_wave_grid[m_ntemp + i] = wavelength[i];
-  }
+//   m_temp_wave_grid.resize(m_ntemp + m_nwave);
+//   for (size_t i = 0; i < m_ntemp; i++) {
+//     m_temp_wave_grid[i] = temp[i];
+//   }
 
-  for (auto const& branch : branches) {
-    m_branch.push_back(parseCompString(branch));
-  }
+//   for (size_t i = 0; i < m_nwave; i++) {
+//     m_temp_wave_grid[m_ntemp + i] = wavelength[i];
+//   }
 
-  if (m_ntemp * m_nwave * branches.size() != m_crossSection.size()) {
-    throw CanteraError(
-        "PhotolysisBase::PhotolysisBase",
-        "Cross-section data size does not match the temperature, "
-        "wavelength, and branch grid sizes.");
-  }
+//   for (auto const& branch : branches) {
+//     m_branch.push_back(parseCompString(branch));
+//   }
 
-  m_valid = true;
-}
+//   if (m_ntemp * m_nwave * branches.size() != m_crossSection.size()) {
+//     throw CanteraError(
+//         "PhotolysisBase::PhotolysisBase",
+//         "Cross-section data size does not match the temperature, "
+//         "wavelength, and branch grid sizes.");
+//   }
 
-void PhotolysisBase::setRateParameters(AnyValue const& rate,
+//   m_valid = true;
+// }
+
+void PhotolysisBase::setRateParameters(const YAML::Node& rate,
                                        map<string, int> const& branch_map) {
-  if (rate.hasKey("resolution")) {
-    double resolution = rate["resolution"].asDouble();
+  if (rate["resolution"]) {
+    double resolution = rate["resolution"].as<double>();
     if (resolution <= 0.0) {
-      throw CanteraError("PhotolysisBase::setRateParameters",
-                         "Resolution must be positive.");
+      throw std::runtime_error("In PhotolysisBase::setRateParameters, Resolution must be positive.");
     }
   }
 
-  if (rate.hasKey("scale")) {
+  if (rate["scale"]) {
     vector<double> scales;
     if (rate["scale"].is<double>()) {
       for (size_t i = 0; i < m_branch.size(); i++) {
-        scales[i] = rate["scale"].asDouble();
+        scales[i] = rate["scale"].as<double>();
       }
     } else {
-      for (auto const& [branch, scale] : rate["scale"].as<AnyMap>()) {
+      for (auto const& [branch, scale] : rate["scale"]()) {
         auto it = branch_map.find(branch);
         if (it == branch_map.end()) {
-          throw CanteraError("PhotolysisBase::setRateParameters",
-                             "Branch '{}' not found", branch);
+          throw std::runtime_error("In PhotolysisBase::setRateParameters, Branch '" + branch + "' not found");
         }
 
-        scales[it->second] = scale.asDouble();
+        scales[it->second] = scale.as<double>();
       }
     }
   }
 }
 
-void PhotolysisBase::setParameters(AnyMap const& node,
-                                   UnitStack const& rate_units) {
-  map<string, int> branch_map;
-  pair<vector<double>, vector<double>> result;
-  vector<double> temperature;
+void PhotolysisBase::setParameters(const YAML::Node& node) {
+  std::map<std::string, int> branch_map;
+  std::pair<torch::Tensor, torch::Tensor> result;
+  torch::Tensor temperature;
 
   ReactionRate::setParameters(node, rate_units);
 
   // set up a dummy reaction to parse the reaction equation
-  Reaction rtmp;
-  parseReactionEquation(rtmp, node["equation"].asString(), node, nullptr);
+  Reaction rtmp = Reaction(node["equation"].asString());
 
   if (rtmp.reactants.size() != 1 || rtmp.reactants.begin()->second != 1) {
-    throw CanteraError(
-        "PhotolysisBase::setParameters",
-        "Photolysis reaction must have one reactant with stoichiometry 1.");
+    throw std::runtime_error(
+        "In PhotolysisBase::setParameters, Photolysis reaction must have one reactant with stoichiometry 1.");
   }
 
   // b0 is reserved for the photoabsorption cross section
   branch_map["b0"] = 0;
   m_branch.push_back(rtmp.reactants);
 
-  if (node.hasKey("branches")) {
-    for (auto const& branch : node["branches"].asVector<AnyMap>()) {
-      std::string branch_name = branch["name"].asString();
+  if (node["branches"]) {
+    for (auto const& branch : node["branches"]) {
+      std::string branch_name = branch["name"].as<std::string>();
 
       // check duplicated branch name
       if (branch_map.find(branch_name) != branch_map.end()) {
-        throw CanteraError("PhotolysisBase::setParameters",
-                           "Duplicated branch name '{}'.", branch_name);
+        throw std::runtime_error(
+            "In PhotolysisBase::setParameters, Duplicated branch name '" +
+            branch_name + "'.");
       }
 
       branch_map[branch_name] = m_branch.size();
-      m_branch.push_back(parseCompString(branch["product"].asString()));
+      m_branch.push_back(parse_comp_string(branch["product"].as<std::string>()));
     }
   } else if (rtmp.products != rtmp.reactants) {  // this is not photoabsorption
     m_branch.push_back(rtmp.products);
   }
 
-  if (node.hasKey("cross-section")) {
-    for (auto const& data : node["cross-section"].asVector<AnyMap>()) {
-      auto format = data["format"].asString();
-      auto temp = data["temperature-range"].asVector<double>(2, 2);
+  if (node["cross-section"]) {
+    for (auto const& data : node["cross-section"]) {
+      auto format = data["format"].as<std::string>();
+      if (format != "YAML" && format != "VULCAN" && format != "KINETICS7") {
+        throw std::runtime_error(
+            "In PhotolysisBase::setParameters, unsupported cross-section format '" +
+            format + "'.");
+      }
+      
+      auto temp = data["temperature-range"].as<std::vector<double>>(2, 2);
       if (temp[0] >= temp[1]) {
-        throw CanteraError("PhotolysisBase::setParameters",
-                           "Temperature range must be strictly increasing.");
+        throw std::runtime_error(
+            "In PhotolysisBase::setParameters, Temperature range must be "
+            "strictly increasing.");
       }
 
       if (temperature.empty()) {
         temperature = temp;
       } else {
         if (temperature.back() < temp.front()) {
-          throw CanteraError("PhotolysisBase::setParameters",
-                             "Temperature ranges has gap in between.");
+          throw std::runtime_error(
+              "In PhotolysisBase::setParameters, Temperature ranges has gap "
+              "in between.");
         }
 
         temperature.pop_back();
@@ -157,29 +167,34 @@ void PhotolysisBase::setParameters(AnyMap const& node,
       }
 
       if (format == "YAML") {
-        for (auto const& entry : data["data"].asVector<vector<double>>()) {
+        for (auto const& entry : data["data"]) {
           result.first.push_back(entry[0]);
           result.second.push_back(entry[1]);
         }
       } else if (format == "VULCAN") {
-        auto files = data["filenames"].asVector<string>();
+        auto files = data["filenames"].as<std::vector<std::string>>();
         result = load_xsection_vulcan(files, m_branch);
       } else if (format == "KINETICS7") {
-        auto files = data["filenames"].asVector<string>();
+        auto files = data["filenames"].as<std::vector<std::string>>();
         result = load_xsection_kinetics7(files, m_branch);
       } else {
-        throw CanteraError("PhotolysisBase::setParameters",
-                           "Invalid cross-section format '{}'.", format);
+        throw std::runtime_error(
+            "In PhotolysisBase::setParameters, unsupported cross-section format '" +
+            format + "'.");
       }
     }
   }
 
-  vector<double>& wavelength(result.first);
-  vector<double>& xsection(result.second);
+  auto wavelength = result.first;
+  auto xsection = result.second;
 
-  m_ntemp = temperature.size();
-  m_nwave = wavelength.size();
-  m_temp_wave_grid.resize(m_ntemp + m_nwave);
+  std::cout << "temperature shape: " << temperature.sizes() << std::endl;
+  std::cout << "wavelength shape: " << wavelength.sizes() << std::endl;
+  std::cout << "xsection shape: " << xsection.sizes() << std::endl;
+
+  m_ntemp = temperature.size(0);
+  m_nwave = wavelength.size(0);
+  m_temp_wave_grid = torch::zeros({m_ntemp + m_nwave});
 
   for (size_t i = 0; i < m_ntemp; i++) {
     m_temp_wave_grid[i] = temperature[i];
@@ -189,11 +204,14 @@ void PhotolysisBase::setParameters(AnyMap const& node,
     m_temp_wave_grid[m_ntemp + i] = wavelength[i];
   }
 
-  // TODO(cli): only works for one temperature range
-  m_crossSection = xsection;
-  m_crossSection.insert(m_crossSection.end(), xsection.begin(), xsection.end());
+  // TODO: test this support for multiple temperature ranges
+  if (m_crossSection.empty()) {
+    m_crossSection = xsection;
+  } else {
+    m_crossSection = torch::cat({m_crossSection, xsection}, 0);
+  }
 
-  if (node.hasKey("rate-constant")) {
+  if (node["rate-constant"]) {
     setRateParameters(node["rate-constant"], branch_map);
   }
 

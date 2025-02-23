@@ -8,6 +8,12 @@
 
 // kintera
 #include <kintera/add_arg.h>
+#include <kintera/xsection/load_xsection.hpp>
+
+// C++
+#include <string>
+#include <vector>
+#include <map>
 
 namespace kintera {
 
@@ -54,27 +60,16 @@ class PhotolysisImpl : public torch::nn::Cloneable<PhotolysisImpl> {
   //! Constructor based on AnyValue content
   explicit PhotolysisBase(AnyMap const& node, UnitStack const& rate_units = {});
 
-  void setParameters(AnyMap const& node, UnitStack const& rate_units) override;
+  void setParameters(YAML::Node const& node);
 
-  //! Set the rate parameters for each branch
-  //! @param rate Rate coefficient data
-  //! @param branch_map Map of branch names to branch indices
-  void setRateParameters(const AnyValue& rate,
-                         map<string, int> const& branch_map);
+  void setRateParameters(YAML::Node const& rate,
+                         std::map<std::string, int> const& branch_map);
 
-  void getParameters(AnyMap& node) const override;
-
-  void getRateParameters(AnyMap& node) const;
-
-  void check(string const& equation) override;
-
-  void validate(const string& equation, const Kinetics& kin) override;
-
-  vector<double> getCrossSection(double temp, double wavelength) const;
+  torch::Tensor getCrossSection(double temp, double wavelength) const;
 
  protected:
   //! composition of photolysis branch products
-  vector<Composition> m_branch;
+  std::vector<Composition> m_branch;
 
   //! number of temperature grid points
   size_t m_ntemp;
@@ -83,7 +78,7 @@ class PhotolysisImpl : public torch::nn::Cloneable<PhotolysisImpl> {
   size_t m_nwave;
 
   //! temperature grid followed by wavelength grid
-  vector<double> m_temp_wave_grid;
+  torch::Tensor m_temp_wave_grid;
 
   //! \brief photolysis cross-section data
   //!
@@ -92,7 +87,7 @@ class PhotolysisImpl : public torch::nn::Cloneable<PhotolysisImpl> {
   //! the second dimension is the number of wavelength grid points, and the
   //! third dimension is the number of branches of the photolysis reaction.
   //! Default units are SI units such as m, m^2, and m^2/m.
-  vector<double> m_crossSection;
+  torch::Tensor m_crossSection;
 };
 
 //! Photolysis reaction rate type depends on temperature and the actinic flux
