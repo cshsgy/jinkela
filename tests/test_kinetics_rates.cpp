@@ -57,10 +57,6 @@ int main(int argc, char* argv[]) {
     kop.species() =
         std::vector<std::string>(species_set.begin(), species_set.end());
 
-    // Generate stoichiometry matrix
-    // auto stoich_matrix =
-    //    kintera::generate_stoichiometry_matrix(reactions, species);
-
     // Create kinetics rates module
     auto kinetics = kintera::KineticRate(kop);
 
@@ -74,14 +70,18 @@ int main(int argc, char* argv[]) {
 
     std::map<std::string, torch::Tensor> other;
     other["pres"] = torch::ones({ncol, nlyr}, torch::kFloat64) * 101325.;
+
     auto conc = 1e-3 * torch::ones({ncol, nlyr, nspecies}, torch::kFloat64)
                            .requires_grad_(true);
 
     // calculate rate constant
     auto log_rc = rate_constant->forward(temp, other);
+    std::cout << "log rate constant at 300 K = " << log_rc << "\n";
 
     // calculate kinetic rate
+    kinetics->to(torch::kFloat64);
     auto reaction_rate = kinetics->forward(conc, log_rc);
+    std::cout << "Reaction rates:\n" << reaction_rate << "\n\n";
 
     // calcualte species rates of change
     auto species_rate = kintera::species_rate(reaction_rate, kinetics->stoich);

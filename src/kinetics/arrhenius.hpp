@@ -24,16 +24,16 @@ struct ArrheniusOptions {
 
   //! Pre-exponential factor. The unit system is (kmol, m, s);
   //! actual units depend on the reaction order
-  ADD_ARG(std::vector<double>, A) = { 1. };
+  ADD_ARG(std::vector<double>, A) = {};
 
   //! Dimensionless temperature exponent
-  ADD_ARG(std::vector<double>, b) = { 0. };
+  ADD_ARG(std::vector<double>, b) = {};
 
   //! Activation energy in K
-  ADD_ARG(std::vector<double>, Ea_R) = { 1. };
+  ADD_ARG(std::vector<double>, Ea_R) = {};
 
   //! Additional 4th parameter in the rate expression
-  ADD_ARG(std::vector<double>, E4_R) = { 0. };
+  ADD_ARG(std::vector<double>, E4_R) = {};
 };
 
 class ArrheniusImpl : public torch::nn::Cloneable<ArrheniusImpl> {

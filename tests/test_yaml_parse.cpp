@@ -54,7 +54,7 @@ int main(int argc, char* argv[]) {
     }
 
     auto rc = rate_constant->forward(temp, other);
-    std::cout << "rate at 300 K = " << rc << "\n";
+    std::cout << "log rate constant at 300 K = " << rc << "\n";
 
     // check out these articles on autograd
     // https://pytorch.org/tutorials/advanced/cpp_autograd.html

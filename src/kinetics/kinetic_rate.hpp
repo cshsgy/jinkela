@@ -19,10 +19,10 @@ struct KineticRateOptions {
 
 class KineticRateImpl : public torch::nn::Cloneable<KineticRateImpl> {
  public:
-  //! activity order (sparse) matrix, shape (nreaction, nspecies)
+  //! activity order matrix, shape (nreaction, nspecies)
   torch::Tensor order;
 
-  //! stoichiometry (sparse) matrix, shape (nreaction, nspecies)
+  //! stoichiometry matrix, shape (nreaction, nspecies)
   torch::Tensor stoich;
 
   //! options with which this `KineticRateImpl` was constructed

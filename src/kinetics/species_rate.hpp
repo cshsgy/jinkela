@@ -7,7 +7,7 @@ namespace kintera {
 
 //! Compute species rate of change
 /*!
- * \param stoich stoichiometry (sparse) matrix, shape (nreaction, nspecies)
+ * \param stoich stoichiometry matrix, shape (nreaction, nspecies)
  * \param kinetic_rate kinetics rate of reactions [kmol/m^3/s],
  *        shape (ncol, nlyr, nreaction)
  */

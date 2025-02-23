@@ -9,68 +9,53 @@ KineticRateImpl::KineticRateImpl(const KineticRateOptions& options_)
 }
 
 void KineticRateImpl::reset() {
-  std::array<std::vector<int>, 2> indices;
-  std::vector<double> order_values;
-  std::vector<double> stoich_values;
+  int nreaction = options.reactions().size();
+  int nspecies = options.species().size();
 
-  for (int rxn_id = 0; rxn_id < options.reactions().size(); rxn_id++) {
-    auto const& rxn = options.reactions()[rxn_id];
+  order = register_buffer("order", torch::zeros({nreaction, nspecies}));
+  stoich = register_buffer("stoich", torch::zeros({nreaction, nspecies}));
 
-    for (const auto& [species, stoich] : rxn.reactants()) {
+  // go through the reactants
+  for (auto it = options.reactions().begin(); it != options.reactions().end();
+       ++it) {
+    int rxn_id = std::distance(options.reactions().begin(), it);
+
+    for (const auto& [species, coeff] : it->reactants()) {
       auto jt = std::find(options.species().begin(), options.species().end(),
                           species);
+      TORCH_CHECK(jt != options.species().end(), "Species ", species,
+                  " not found in species list");
+
       int species_id = std::distance(options.species().begin(), jt);
+      stoich[rxn_id][species_id] -= coeff;
 
-      indices[0].push_back(rxn_id);
-      indices[1].push_back(species_id);
-      stoich_values.push_back(stoich);
-
-      if (rxn.orders().find(species) != rxn.orders().end()) {
-        order_values.push_back(rxn.orders().at(species));
+      if (it->orders().find(species) != it->orders().end()) {
+        order[rxn_id][species_id] = it->orders().at(species);
       } else {
-        order_values.push_back(1.0);
+        order[rxn_id][species_id] = 1.;
       }
     }
 
-    for (const auto& [species, stoich] : rxn.products()) {
+    for (const auto& [species, coeff] : it->products()) {
       auto jt = std::find(options.species().begin(), options.species().end(),
                           species);
+      TORCH_CHECK(jt != options.species().end(), "Species ", species,
+                  " not found in species list");
       int species_id = std::distance(options.species().begin(), jt);
-
-      indices[0].push_back(rxn_id);
-      indices[1].push_back(species_id);
-      stoich_values.push_back(-stoich);
+      stoich[rxn_id][species_id] += coeff;
     }
 
     // reversible reaction?
   }
-
-  // flatten the indices
-  std::vector<int> flat;
-  for (auto const& idx : indices) {
-    flat.insert(flat.end(), idx.begin(), idx.end());
-  }
-
-  order = register_buffer(
-      "order",
-      torch::sparse_coo_tensor(
-          torch::tensor(flat).view({2, (int)indices[0].size()}),
-          torch::tensor(order_values),
-          {(int)options.reactions().size(), (int)options.species().size()}));
-
-  stoich = register_buffer(
-      "stoich",
-      torch::sparse_coo_tensor(
-          torch::tensor(flat).view({2, (int)indices[0].size()}),
-          torch::tensor(stoich_values),
-          {(int)options.reactions().size(), (int)options.species().size()}));
 }
 
 torch::Tensor KineticRateImpl::forward(torch::Tensor conc,
                                        torch::Tensor log_rate_constant) {
   int nreaction = order.size(0);
   int nspecies = order.size(1);
-  return (order.view({1, 1, nreaction, nspecies}).matmul(conc.log()) +
+  return (order.view({1, 1, nreaction, -1})
+              .matmul(conc.unsqueeze(-1).log())
+              .squeeze(-1) +
           log_rate_constant)
       .exp();
 }

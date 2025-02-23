@@ -48,6 +48,9 @@ void RateConstantImpl::reset() {
 torch::Tensor RateConstantImpl::forward(
     torch::Tensor T, std::map<std::string, torch::Tensor> const& other) {
   auto shape = T.sizes().vec();
+  for (int i = 0; i < rxn_id_start.size(); i++) {
+    std::cout << rxn_id_start[i] << " " << rxn_id_end[i] << std::endl;
+  }
   shape.push_back(rxn_id_end.back());
 
   torch::Tensor result = torch::empty(shape, T.options());
