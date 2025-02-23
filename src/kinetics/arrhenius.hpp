@@ -7,34 +7,12 @@
 #include <torch/nn/modules/common.h>
 #include <torch/nn/modules/container/any.h>
 
-// yaml
-#include <yaml-cpp/yaml.h>
-
 // kintera
 #include <kintera/add_arg.h>
 
+#include "rate_options.hpp"
+
 namespace kintera {
-
-//! Options to initialize `Arrhenius`
-struct ArrheniusOptions {
-  static ArrheniusOptions from_yaml(const YAML::Node& node);
-
-  //! Pre-exponential factor. The unit system is (kmol, m, s);
-  //! actual units depend on the reaction order
-  ADD_ARG(double, A) = 1.;
-
-  //! Dimensionless temperature exponent
-  ADD_ARG(double, b) = 0.;
-
-  //! Activation energy in K
-  ADD_ARG(double, Ea_R) = 1.;
-
-  //! Additional 4th parameter in the rate expression
-  ADD_ARG(double, E4_R) = 0.;
-
-  //! Reaction order (non-dimensional)
-  ADD_ARG(double, order) = 1;
-};
 
 class ArrheniusImpl : public torch::nn::Cloneable<ArrheniusImpl> {
  public:
@@ -43,17 +21,18 @@ class ArrheniusImpl : public torch::nn::Cloneable<ArrheniusImpl> {
 
   //! Constructor to initialize the layer
   ArrheniusImpl() = default;
-  explicit ArrheniusImpl(ArrheniusOptions const& options_);
+  explicit ArrheniusImpl(RateOptions const& options_);
   void reset() override {}
   void pretty_print(std::ostream& os) const override;
 
   //! Compute the reaction rate constant
   /*!
    * \param T temperature [K]
-   * \param P pressure [Pa]
-   * \return reaction rate constant in (kmol, m, s)
+   * \param other additional parameters
+   * \return log reaction rate constant in ln(kmol, m, s)
    */
-  torch::Tensor forward(torch::Tensor T, torch::Tensor P);
+  torch::Tensor forward(torch::Tensor T,
+                        std::map<std::string, torch::Tensor> const& other);
 };
 TORCH_MODULE(Arrhenius);
 

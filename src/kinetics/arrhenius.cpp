@@ -5,33 +5,7 @@
 
 namespace kintera {
 
-ArrheniusOptions ArrheniusOptions::from_yaml(const YAML::Node& node) {
-  ArrheniusOptions options;
-  if (node["A"]) {
-    options.A(node["A"].as<double>());
-  }
-
-  if (node["b"]) {
-    options.b(node["b"].as<double>());
-  }
-
-  if (node["Ea"]) {
-    options.Ea_R(node["Ea"].as<double>());
-  }
-
-  if (node["E4"]) {
-    options.E4_R(node["E4"].as<double>());
-  }
-
-  if (node["order"]) {
-    options.order(node["order"].as<double>());
-  }
-
-  return options;
-}
-
-ArrheniusImpl::ArrheniusImpl(ArrheniusOptions const& options_)
-    : options(options_) {
+ArrheniusImpl::ArrheniusImpl(RateOptions const& options_) : options(options_) {
   reset();
 }
 
@@ -40,8 +14,9 @@ void ArrheniusImpl::pretty_print(std::ostream& os) const {
      << ", Ea = " << options.Ea_R() * constants::GasConstant << " J/kmol";
 }
 
-torch::Tensor ArrheniusImpl::forward(torch::Tensor T, torch::Tensor P) {
-  return options.A() * (options.b() * T.log() - options.Ea_R() * 1.0 / T).exp();
+torch::Tensor ArrheniusImpl::forward(
+    torch::Tensor T, std::map<std::string, torch::Tensor> const& other) {
+  return log(options.A()) + options.b() * T.log() - options.Ea_R() * 1.0 / T;
 }
 
 /*torch::Tensor ArrheniusRate::ddTRate(torch::Tensor T, torch::Tensor P) const {
