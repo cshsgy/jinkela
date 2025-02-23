@@ -1,7 +1,10 @@
-// kintera
-#include "arrhenius.hpp"
+// yaml
+#include <yaml-cpp/yaml.h>
 
+// kintera
 #include <kintera/utils/constants.hpp>
+
+#include "arrhenius.hpp"
 
 namespace kintera {
 
@@ -84,7 +87,7 @@ ArrheniusImpl::ArrheniusImpl(ArrheniusOptions const& options_)
   reset();
 }
 
-ArrheniusImpl::reset() {
+void ArrheniusImpl::reset() {
   logA = register_buffer("logA", torch::tensor(options.A()).log());
   b = register_buffer("b", torch::tensor(options.b()));
   Ea_R = register_buffer("Ea_R", torch::tensor(options.Ea_R()));
@@ -104,8 +107,8 @@ void ArrheniusImpl::pretty_print(std::ostream& os) const {
 
 torch::Tensor ArrheniusImpl::forward(
     torch::Tensor T, std::map<std::string, torch::Tensor> const& other) {
-  return logA.view({1, 1, -1}) + b.view({1, 1, -1} * T.unsqueeze(-1).log()
-      - Ea_R.view({1, 1, -1}) / T.unsqueeze(-1);
+  return logA.view({1, 1, -1}) + b.view({1, 1, -1}) * T.unsqueeze(-1).log() -
+         Ea_R.view({1, 1, -1}) / T.unsqueeze(-1);
 }
 
 /*torch::Tensor ArrheniusRate::ddTRate(torch::Tensor T, torch::Tensor P) const {

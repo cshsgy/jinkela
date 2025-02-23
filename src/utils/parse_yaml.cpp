@@ -72,4 +72,33 @@ std::map<Reaction, torch::nn::AnyModule> parse_reactions_yaml(
   return reaction_rates;
 }
 
+std::vector<Reaction> parse_reactions_yaml(
+    const std::string& filename, std::vector<std::string> const& types) {
+  std::vector<Reaction> reactions;
+
+  YAML::Node root = YAML::LoadFile(filename);
+  printf("Loading complete\n");
+
+  for (auto const& type : types) {
+    for (auto const& rxn_node : root) {
+      if (!rxn_node["type"]) {
+        TORCH_CHECK(false, "Reaction type not specified");
+      }
+
+      if (rxn_node["type"].as<std::string>() != type) {
+        continue;
+      }
+
+      if (!rxn_node["equation"]) {
+        TORCH_CHECK(false, "Reaction equation not specified");
+      }
+
+      std::string equation = rxn_node["equation"].as<std::string>();
+      reactions.emplace_back(equation);
+    }
+  }
+
+  return reactions;
+}
+
 }  // namespace kintera

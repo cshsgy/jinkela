@@ -8,48 +8,62 @@ KineticRateImpl::KineticRateImpl(const KineticRateOptions& options_)
   reset();
 }
 
-KineticRateImpl::reset() {
-  std::pair<std::vector<int>> indices;
+void KineticRateImpl::reset() {
+  std::array<std::vector<int>, 2> indices;
   std::vector<double> order_values;
   std::vector<double> stoich_values;
 
-  for (const auto& rxn : options.reactions()) {
-    int rxn_id = std::distance(options.reactions().begin(), rxn);
+  for (int rxn_id = 0; rxn_id < options.reactions().size(); rxn_id++) {
+    auto const& rxn = options.reactions()[rxn_id];
 
     for (const auto& [species, stoich] : rxn.reactants()) {
-      int species_id = std::distance(options.species().begin(), species);
+      auto jt = std::find(options.species().begin(), options.species().end(),
+                          species);
+      int species_id = std::distance(options.species().begin(), jt);
 
-      indices.first.push_back(rxn_id);
-      indices.second.push_back(species_id);
+      indices[0].push_back(rxn_id);
+      indices[1].push_back(species_id);
       stoich_values.push_back(stoich);
 
       if (rxn.orders().find(species) != rxn.orders().end()) {
-        order_values.push_back(rxn.orders()[species]);
+        order_values.push_back(rxn.orders().at(species));
       } else {
         order_values.push_back(1.0);
       }
     }
 
     for (const auto& [species, stoich] : rxn.products()) {
-      int species_id = std::distance(options.species().begin(), species);
+      auto jt = std::find(options.species().begin(), options.species().end(),
+                          species);
+      int species_id = std::distance(options.species().begin(), jt);
 
-      indices.first.push_back(rxn_id);
-      indices.second.push_back(species_id);
+      indices[0].push_back(rxn_id);
+      indices[1].push_back(species_id);
       stoich_values.push_back(-stoich);
     }
 
     // reversible reaction?
   }
 
+  // flatten the indices
+  std::vector<int> flat;
+  for (auto const& idx : indices) {
+    flat.insert(flat.end(), idx.begin(), idx.end());
+  }
+
   order = register_buffer(
-      "order", torch::sparse_coo_tensor(
-                   indices, order_values,
-                   {options.reactions().size(), options.species().size()}));
+      "order",
+      torch::sparse_coo_tensor(
+          torch::tensor(flat).view({2, (int)indices[0].size()}),
+          torch::tensor(order_values),
+          {(int)options.reactions().size(), (int)options.species().size()}));
 
   stoich = register_buffer(
-      "stoich", torch::sparse_coo_tensor(
-                    indices, stoich_values,
-                    {options.reactions().size(), options.species().size()}));
+      "stoich",
+      torch::sparse_coo_tensor(
+          torch::tensor(flat).view({2, (int)indices[0].size()}),
+          torch::tensor(stoich_values),
+          {(int)options.reactions().size(), (int)options.species().size()}));
 }
 
 torch::Tensor KineticRateImpl::forward(torch::Tensor conc,

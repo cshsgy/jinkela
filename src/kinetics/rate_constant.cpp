@@ -11,7 +11,7 @@ RateConstantImpl::RateConstantImpl(const RateConstantOptions& options_)
   reset();
 }
 
-RateConstantImpl::reset() {
+void RateConstantImpl::reset() {
   YAML::Node root = YAML::LoadFile(options.reaction_file());
   printf("Loading complete\n");
 
@@ -41,11 +41,11 @@ RateConstantImpl::reset() {
   }
 
   for (auto& eval_rate_constant : eval_rate_constants) {
-    register_module("eval_rate_constant", eval_rate_constant);
+    register_module("eval_rate_constant", eval_rate_constant.ptr());
   }
 }
 
-torch::Tensor RateConstant::forward(
+torch::Tensor RateConstantImpl::forward(
     torch::Tensor T, std::map<std::string, torch::Tensor> const& other) {
   auto shape = T.sizes().vec();
   shape.push_back(rxn_id_end.back());
@@ -60,7 +60,7 @@ torch::Tensor RateConstant::forward(
   return result;
 }
 
-torch::Tensor KineticsRatesImpl::forward(torch::Tensor T, torch::Tensor P,
+/*torch::Tensor KineticsRatesImpl::forward(torch::Tensor T, torch::Tensor P,
                                          torch::Tensor C) const {
   const auto n_reactions = stoich_matrix_.size(0);
   const auto n_species = stoich_matrix_.size(1);
@@ -72,6 +72,6 @@ torch::Tensor KineticsRatesImpl::forward(torch::Tensor T, torch::Tensor P,
   rates = rates.movedim(0, -1);
   auto result = torch::matmul(rates, stoich_matrix_);
   return result.movedim(-1, 0);
-}
+}*/
 
 }  // namespace kintera

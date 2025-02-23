@@ -10,9 +10,9 @@
 // kintera
 #include <kintera/add_arg.h>
 
-#include "rate_options.hpp"
-
-class YAML::Node;
+namespace YAML {
+class Node;
+}
 
 namespace kintera {
 
