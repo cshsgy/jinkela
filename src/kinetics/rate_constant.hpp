@@ -8,38 +8,44 @@
 #include <torch/nn/modules/container/any.h>
 
 // kintera
-#include <kintera/reaction.hpp>
+#include "arrhenius.hpp"
 
 namespace kintera {
 
 struct RateConstantOptions {
   ADD_ARG(std::vector<std::string>, types) = {};
-  ADD_ARG(std::vector<RateEvaluatorOptions>, rate_opts) = {};
+  ADD_ARG(std::string, reaction_file) = "";
 };
 
-class RateConstantImpl : public torch::nn::Module {
+class RateConstantImpl : public torch::nn::Cloneable<RateConstantImpl> {
  public:
-  //! evaluate reaction rate coefficients
-  std::vector<torch::nn::AnyModule> evals;
+  //! start reaction index of each reaction type
+  std::vector<int> rxn_id_start;
+
+  //! end reaction index of each reaction type (exclusive)
+  std::vector<int> rxn_id_end;
 
   //! options with which this `RateConstantImpl` was constructed
   RateConstantOptions options;
+
+  //! submodule: evaluate reaction rate constants
+  std::vector<torch::nn::AnyModule> eval_rate_constants;
 
   //! Constructor to initialize the layer
   RateConstantImpl() = default;
   explicit RateConstantImpl(const RateConstantOptions& options_);
   void reset() override;
 
-  //! Compute species rate of change
+  //! Compute reaction rate constant
   /*!
    * \param T temperature [K], shape (ncol, nlyr)
    * \param other other parameters
-   * \return log rate constant in log(kmol, m, s), shape (ncol, nlyr, nreaction)
+   * \return log rate constant in ln(kmol, m, s), shape (ncol, nlyr, nreaction)
    */
   torch::Tensor forward(torch::Tensor T,
                         std::map<std::string, torch::Tensor> const& other);
 };
 
-TORCH_MODULE_IMPL(RateConstant, RateConstantImpl);
+TORCH_MODULE(RateConstant);
 
 }  // namespace kintera

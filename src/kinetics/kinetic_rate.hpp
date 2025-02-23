@@ -17,7 +17,7 @@ struct KineticRateOptions {
   ADD_ARG(std::vector<Reaction>, reactions) = {};
 };
 
-class KineticRateImpl : public torch::nn::Module {
+class KineticRateImpl : public torch::nn::Cloneable<KineticRateImpl> {
  public:
   //! activity order (sparse) matrix, shape (nreaction, nspecies)
   torch::Tensor order;
@@ -38,12 +38,12 @@ class KineticRateImpl : public torch::nn::Module {
    * \param conc concentration [kmol/m^3], shape (ncol, nlyr, nspecies)
    * \param log_rate_constant log rate constant in ln(kmol, m, s),
    *        shape (ncol, nlyr, nreaction)
-   * \return kinetics rate of reactions [kmol/m^3/s], shape (ncol, nlyr,
-   * nreaction)
+   * \return kinetic rate of reactions [kmol/m^3/s],
+   *        shape (ncol, nlyr, nreaction)
    */
   torch::Tensor forward(torch::Tensor conc, torch::Tensor log_rate_constant);
 };
 
-TORCH_MODULE_IMPL(KineticRate, KineticRateImpl);
+TORCH_MODULE(KineticRate);
 
 }  // namespace kintera

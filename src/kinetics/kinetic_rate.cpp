@@ -56,7 +56,7 @@ torch::Tensor KineticRateImpl::forward(torch::Tensor conc,
                                        torch::Tensor log_rate_constant) {
   int nreaction = order.size(0);
   int nspecies = order.size(1);
-  return (torch::matmul(order.view({1, 1, nreaction, nspecies}), conc.log()) +
+  return (order.view({1, 1, nreaction, nspecies}).matmul(conc.log()) +
           log_rate_constant)
       .exp();
 }
