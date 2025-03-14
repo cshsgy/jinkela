@@ -5,7 +5,7 @@
 If you have forked this repository, please enable notifications or watch for updates!
 
 ### Automatic fethced dependencies
-During the build process, the following dependencies are fetched automatically:
+During the build process, the following dependencies are fetched and cached automatically:
 | Package Name | Repository URL | Version |
 |-------------|---------------|---------|
 | fmt | [https://github.com/fmtlib/fmt](https://github.com/fmtlib/fmt) | 11.1.2 |
