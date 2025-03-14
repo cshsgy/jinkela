@@ -8,7 +8,7 @@
 #include <torch/nn/modules/container/any.h>
 
 // kintera
-#include <kintera/reaction.hpp>
+#include <reaction.hpp>
 
 namespace kintera {
 

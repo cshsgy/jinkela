@@ -3,9 +3,9 @@
 
 #include <configure.h>  // MAX_PHOTO_BRANCHES
 
-#include <kintera/math/interpolation.hpp>
-#include <kintera/utils/find_resource.hpp>
-#include <kintera/utils/parse_comp_string.hpp>
+#include <math/interpolation.hpp>
+#include <utils/find_resource.hpp>
+#include <utils/parse_comp_string.hpp>
 
 namespace kintera {
 

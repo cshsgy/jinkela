@@ -2,7 +2,7 @@
 #include <yaml-cpp/yaml.h>
 
 // kintera
-#include <kintera/utils/constants.hpp>
+#include <utils/constants.hpp>
 
 #include "arrhenius.hpp"
 
