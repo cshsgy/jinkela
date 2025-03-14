@@ -28,8 +28,8 @@ def extract_dependencies(directory):
 
     return dependencies
 
-def write_markdown_file(dependencies, output_file="dependencies.md"):
-    with open(output_file, 'w', encoding='utf-8') as file:
+def write_markdown_file(dependencies, output_file="README.md"):
+    with open(output_file, 'a', encoding='utf-8') as file:
         file.write("| Package Name | Repository URL | Version |\n")
         file.write("|-------------|---------------|---------|\n")
         for package_name, repo_url, repo_tag in dependencies:
@@ -39,4 +39,4 @@ if __name__ == "__main__":
     cmake_directory = "cmake"
     dependencies = extract_dependencies(cmake_directory)
     write_markdown_file(dependencies)
-    print(f"Dependencies written to dependencies.md")
+    print(f"Dependencies written to README.md")
