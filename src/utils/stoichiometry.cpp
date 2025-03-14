@@ -8,7 +8,7 @@
 namespace kintera {
 
 torch::Tensor generate_stoichiometry_matrix(
-    const std::map<Reaction, torch::nn::AnyModule>& reactions,
+    const std::vector<Reaction>& reactions,
     const std::vector<std::string>& species) {
   auto matrix = torch::zeros(
       {static_cast<long>(reactions.size()), static_cast<long>(species.size())},
@@ -16,7 +16,7 @@ torch::Tensor generate_stoichiometry_matrix(
 
   for (auto it = reactions.begin(); it != reactions.end(); ++it) {
     size_t i = std::distance(reactions.begin(), it);
-    for (const auto& [species_name, coeff] : it->first.reactants()) {
+    for (const auto& [species_name, coeff] : it->reactants()) {
       auto jt = std::find(species.begin(), species.end(), species_name);
       if (jt == species.end()) {
         throw std::runtime_error("Species " + species_name +
@@ -26,7 +26,7 @@ torch::Tensor generate_stoichiometry_matrix(
       matrix[i][j] -= coeff;
     }
 
-    for (const auto& [species_name, coeff] : it->first.products()) {
+    for (const auto& [species_name, coeff] : it->products()) {
       auto jt = std::find(species.begin(), species.end(), species_name);
       if (jt == species.end()) {
         throw std::runtime_error("Species " + species_name +

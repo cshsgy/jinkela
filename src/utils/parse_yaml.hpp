@@ -15,4 +15,7 @@ namespace kintera {
 std::map<Reaction, torch::nn::AnyModule> parse_reactions_yaml(
     const std::string& filename);
 
+std::vector<Reaction> parse_reactions_yaml(
+    const std::string& filename, std::vector<std::string> const& types);
+
 }  // namespace kintera
