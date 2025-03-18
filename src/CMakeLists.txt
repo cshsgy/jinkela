@@ -46,8 +46,6 @@ set_target_properties(${namel}_${buildl}
 
 target_link_libraries(${namel}_${buildl}
     PUBLIC
-    fmt::fmt
-    elements::elements
     pyharp::harp
     )
 
