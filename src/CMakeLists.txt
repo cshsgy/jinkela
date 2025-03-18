@@ -19,8 +19,6 @@ include_directories(
   ${CMAKE_BINARY_DIR}
   SYSTEM ${TORCH_API_INCLUDE_DIR}
   SYSTEM ${TORCH_INCLUDE_DIR}
-  SYSTEM ${FMT_INCLUDE_DIR}
-  SYSTEM ${YAML_CPP_INCLUDE_DIR}
   )
 
 string(TOLOWER ${CMAKE_BUILD_TYPE} buildl)
@@ -31,7 +29,6 @@ string(TOUPPER ${namel} nameu)
 
 file(GLOB src_files
   *.cpp
-  math/*.cpp
   xsection/*.cpp
   utils/*.cpp
   kinetics/*.cpp
@@ -49,7 +46,7 @@ set_target_properties(${namel}_${buildl}
 
 target_link_libraries(${namel}_${buildl}
     PUBLIC
-    fmt::fmt
+    pyharp::harp
     )
 
 add_library(kintera::kintera ALIAS ${namel}_${buildl})
