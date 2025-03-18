@@ -8,7 +8,7 @@
 #include <torch/nn/modules/container/any.h>
 
 // kintera
-#include <add_arg.h>
+#include <kintera/add_arg.h>
 
 namespace YAML {
 class Node;

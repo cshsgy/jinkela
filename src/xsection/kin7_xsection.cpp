@@ -1,11 +1,12 @@
+// harp
+#include <harp/math/interpolation.hpp>
+
 // kintera
+#include <kintera/reaction.hpp>
+#include <kintera/utils/find_resource.hpp>
+#include <kintera/utils/parse_comp_string.hpp>
+
 #include "kin7_xsection.hpp"
-
-#include <configure.h>  // MAX_PHOTO_BRANCHES
-
-#include <math/interpolation.hpp>
-#include <utils/find_resource.hpp>
-#include <utils/parse_comp_string.hpp>
 
 namespace kintera {
 
@@ -131,40 +132,17 @@ torch::Tensor Kin7XsectionImpl::forward(torch::Tensor wave, torch::Tensor aflux,
   int nbranch = options.branches().size();
   int nspecies = options.species().size();
 
-  auto dims = torch::tensor(
-      {kwave.size(0)},
-      torch::TensorOptions().dtype(torch::kInt64).device(wave.device()));
+  auto data =
+      harp::interpn({wave}, {kwave}, kdata).view({nwave, 1, 1, nbranch});
 
-  auto out = torch::empty({nwave, ncol, nlyr, nbranch},
-                          torch::TensorOptions().device(wave.device()));
-
-  auto iter =
-      at::TensorIteratorConfig()
-          .resize_outputs(false)
-          .check_all_same_dtype(true)
-          .declare_static_shape(out.sizes())
-          .add_output(out)
-          .add_owned_const_input(
-              wave.view({-1, 1, 1, 1}).expand({-1, ncol, nlyr, nbranch}))
-          .build();
-
-  if (wave.is_cpu()) {
-    call_interpn_cpu<MAX_PHOTO_BRANCHES>(iter, kdata, kwave, dims,
-                                         /*ndim=*/1, /*nval=*/nbranch);
-  } else if (wave.is_cuda()) {
-    // call_interpn_cuda<MAX_PHOTO_BRANCHES>(iter, kdata, kwave, dims, 1);
-  } else {
-    TORCH_CHECK(false, "Unsupported device");
-  }
-
-  // save the interpolated cross section
+  // save the total cross section
   // (nreaction, nwave, ncol, nlyr)
   if (kcross.has_value()) {
-    kcross.value()[options.reaction_id()].copy_(out.sum(3));
+    kcross.value()[options.reaction_id()].copy_(data.sum(3));
   }
 
   // (ncol, nlyr, nbranch)
-  auto rate = torch::trapezoid(aflux.unsqueeze(-1) * out, wave, 0);
+  auto rate = torch::trapezoid(aflux.unsqueeze(-1) * data, wave, 0);
   // total_rate = rate.sum(2);
 
   // (ncol, nlyr, nspecies)

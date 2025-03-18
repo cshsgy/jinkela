@@ -12,6 +12,8 @@
 // PNetCDF output (PNETCDFOUTPUT or NO_PNETCDFOUTPUT)
 #define @PNETCDF_OPTION@
 
+#define HARP_ROOT_DIR "@CMAKE_SOURCE_DIR@"
+
 // C/C++
 #include <cstdlib>
 

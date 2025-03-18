@@ -8,7 +8,7 @@
 #include <torch/nn/modules/container/any.h>
 
 // kintera
-#include <add_arg.h>
+#include <kintera/add_arg.h>
 
 namespace kintera {
 
@@ -66,6 +66,11 @@ class Kin7XsectionImpl : public torch::nn::Cloneable<Kin7XsectionImpl> {
   torch::Tensor forward(torch::Tensor wave, torch::Tensor aflux,
                         torch::optional<torch::Tensor> kcross = torch::nullopt,
                         torch::optional<torch::Tensor> temp = torch::nullopt);
+
+ protected:
+  // This allows type erasure with default arguments
+  FORWARD_HAS_DEFAULT_ARGS({2, torch::nn::AnyValue(torch::nullopt)},
+                           {3, torch::nn::AnyValue(torch::nullopt)})
 };
 TORCH_MODULE(Kin7Xsection);
 

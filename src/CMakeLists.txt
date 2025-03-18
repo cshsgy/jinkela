@@ -15,7 +15,7 @@
 #   target_link_libraries(kintera::kintera)
 
 include_directories(
-  ${CMAKE_CURRENT_SOURCE_DIR}
+  "${CMAKE_CURRENT_SOURCE_DIR}/.."
   ${CMAKE_BINARY_DIR}
   SYSTEM ${TORCH_API_INCLUDE_DIR}
   SYSTEM ${TORCH_INCLUDE_DIR}
@@ -48,8 +48,8 @@ set_target_properties(${namel}_${buildl}
 target_link_libraries(${namel}_${buildl}
     PUBLIC
     fmt::fmt
-    yaml-cpp::yaml-cpp
     elements::elements
+    pyharp::harp
     )
 
 add_library(kintera::kintera ALIAS ${namel}_${buildl})
@@ -78,5 +78,5 @@ if (CUDAToolkit_FOUND)
 endif()
 
 set(KINTERA_INCLUDE_DIR
-  ${CMAKE_CURRENT_SOURCE_DIR}
+  "${CMAKE_CURRENT_SOURCE_DIR}/.."
   CACHE INTERNAL "kintera include directory")

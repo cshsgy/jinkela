@@ -3,7 +3,7 @@
 // torch
 #include <torch/torch.h>
 
-namespace harp {
+namespace kintera {
 
 //! Multidimensional linear interpolation
 /*!
@@ -17,4 +17,4 @@ torch::Tensor interpn(std::vector<torch::Tensor> const& query_coords,
                       std::vector<torch::Tensor> const& coords,
                       torch::Tensor const& lookup, bool extrapolate = false);
 
-}  // namespace harp
+}  // namespace kintera

@@ -2,10 +2,10 @@
 #include <iostream>
 #include <vector>
 
-// harp
+// kintera
 #include "interpn.hpp"
 
-namespace harp {
+namespace kintera {
 
 // Recursive helper function for interpolation
 torch::Tensor interpn_recur(
@@ -93,4 +93,4 @@ torch::Tensor interpn(std::vector<torch::Tensor> const& query_coords,
   return interpn_recur(query_coords, coords, lookup, {}, extrapolate).view(vec);
 }
 
-}  // namespace harp
+}  // namespace kintera
