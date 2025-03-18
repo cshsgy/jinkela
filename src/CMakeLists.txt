@@ -29,7 +29,6 @@ string(TOUPPER ${namel} nameu)
 
 file(GLOB src_files
   *.cpp
-  math/*.cpp
   xsection/*.cpp
   utils/*.cpp
   kinetics/*.cpp
