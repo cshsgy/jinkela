@@ -73,8 +73,6 @@ message(STATUS "${Blue}${PROJECT_NAME}-3. Setting up system libraries ...${Color
 include(${CMAKE_SOURCE_DIR}/cmake/pyharp.cmake)
 find_package(Torch REQUIRED)
 
-include(${CMAKE_SOURCE_DIR}/cmake/yamlpp.cmake)
-
 if (CUDA)
   find_package(CUDAToolkit REQUIRED)
 else()
