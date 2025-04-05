@@ -1,21 +1,22 @@
 #pragma once
 
-#ifdef __CUDACC__
-#define DISPATCH_MACRO __host__ __device__
-#else
-#define DISPATCH_MACRO
-#endif
-
 // NetCDF output (NETCDFOUTPUT or NO_NETCDFOUTPUT)
 #define @NETCDF_OPTION@
 
 // PNetCDF output (PNETCDFOUTPUT or NO_PNETCDFOUTPUT)
 #define @PNETCDF_OPTION@
 
-#define HARP_ROOT_DIR "@CMAKE_SOURCE_DIR@"
-
-// C/C++
-#include <cstdlib>
+#ifdef __CUDACC__
+  #define DISPATCH_MACRO __host__ __device__
+#else
+  #define DISPATCH_MACRO
+#endif
 
 constexpr char KINTERA_ROOT_DIR[] = "@CMAKE_CURRENT_SOURCE_DIR@";
-constexpr int MAX_PHOTO_BRANCHES = @MAX_PHOTO_BRANCHES@;
+constexpr char HARP_ROOT_DIR[] = "@HARP_INCLUDE_DIR@";
+
+enum class Index {
+  int IDN = 0,
+  int IPR,
+  int ICY,
+}

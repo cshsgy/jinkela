@@ -1,10 +1,3 @@
-// spdlog
-#include <configure.h>
-#include <spdlog/spdlog.h>
-
-// global
-#include <globals.h>  // logger
-
 // torch
 #include <torch/torch.h>
 
@@ -14,7 +7,8 @@
 #include "condensation.hpp"
 #include "thermo_formatter.hpp"
 
-namespace canoe {
+namespace kintera {
+
 // x -> y at constant volume (mole concentration)
 inline torch::Tensor satfunc1v(torch::Tensor& b, torch::Tensor& jac,
                                torch::Tensor conc, torch::Tensor s,
@@ -23,7 +17,7 @@ inline torch::Tensor satfunc1v(torch::Tensor& b, torch::Tensor& jac,
   auto const& y = conc.select(3, iy);
 
   b.select(3, j) = x - s;
-  b.select(3, j).clamp_min_(-y);
+  b.select(3, j).clamp_(-y);
 
   jac.select(3, j).select(3, ix) = where(b.select(3, j) > 0., 1., 0.);
   jac.select(3, j).select(3, iy) = where(b.select(3, j) < 0., -1., 0.);
@@ -39,7 +33,7 @@ inline void satfunc1p(torch::Tensor& b, torch::Tensor& jac, torch::Tensor xfrac,
   auto const& y = xfrac.select(3, iy);
 
   b.select(3, j) = torch::where(s > 1., -y, (x - s * xg) / (1. - s));
-  b.select(3, j).clamp_min_(-y);
+  b.select(3, j).clamp_(-y);
 
   jac.select(3, j).select(3, ix) = where(b.select(3, j) > 0., 1., 0.);
   jac.select(3, j).select(3, iy) = where(b.select(3, j) < 0., -1., 0.);
@@ -71,8 +65,6 @@ void CondensationImpl::reset() {
       }
     }
   }
-
-  LOG_INFO(logger, "{} resets with options: {}", name(), options);
 }
 
 torch::Tensor CondensationImpl::forward(torch::Tensor temp, torch::Tensor pres,
@@ -197,4 +189,4 @@ torch::Tensor CondensationImpl::equilibrate_tp(torch::Tensor temp,
   return stoich_local.matmul(rates.unsqueeze(-1)).squeeze(-1);
 }
 
-}  // namespace canoe
+}  // namespace kintera

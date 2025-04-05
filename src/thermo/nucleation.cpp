@@ -7,7 +7,8 @@
 #include "vapors/ammonium_hydrosulfide_vapors.hpp"
 #include "vapors/water_vapors.hpp"
 
-namespace canoe {
+namespace kintera {
+
 std::string concatenate(const Composition& comp, char sep) {
   if (comp.empty()) return "";
   if (comp.size() == 1) return comp.begin()->first;
@@ -101,4 +102,4 @@ torch::Tensor Nucleation::eval_logf_ddT(torch::Tensor tem) const {
   return out;
 }
 
-}  // namespace canoe
+}  // namespace kintera

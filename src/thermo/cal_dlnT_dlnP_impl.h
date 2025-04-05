@@ -3,7 +3,7 @@
 // base
 #include <configure.h>
 
-namespace canoe {
+namespace kintera {
 
 //! Eq.1 in Li2018
 template <typename T>
@@ -36,4 +36,4 @@ inline DISPATCH_MACRO T cal_dlnT_dlnP(T const* q, T const* gammad,
   return (1. + c1) / (cphat_ov_r + (c2 + c1 * c1) / (1. + c3));
 }
 
-}  // namespace canoe
+}  // namespace kintera

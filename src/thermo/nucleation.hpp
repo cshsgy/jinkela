@@ -3,16 +3,13 @@
 // torch
 #include <torch/torch.h>
 
-// base
-// clang-format off
-#include <configure.h>
+// kintera
 #include <add_arg.h>
-// clang-format on
 
-// fvm
-#include <fvm/kintera/reaction.hpp>
+#include <kintera/reaction.hpp>
 
-namespace canoe {
+namespace kintera {
+
 using func1_t = std::function<torch::Tensor(torch::Tensor)>;
 
 struct Nucleation {
@@ -30,4 +27,4 @@ struct Nucleation {
   ADD_ARG(func1_t, logf_ddT);
 };
 
-}  // namespace canoe
+}  // namespace kintera
