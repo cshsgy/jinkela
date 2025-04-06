@@ -14,9 +14,3 @@
 
 constexpr char KINTERA_ROOT_DIR[] = "@CMAKE_CURRENT_SOURCE_DIR@";
 constexpr char HARP_ROOT_DIR[] = "@HARP_INCLUDE_DIR@";
-
-enum class Index {
-  int IDN = 0,
-  int IPR,
-  int ICY,
-}

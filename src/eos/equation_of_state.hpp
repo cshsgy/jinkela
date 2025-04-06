@@ -3,11 +3,9 @@
 // torch
 #include <torch/torch.h>
 
-// harp
-#include <pyharp/constants.h>
-
 // kintera
-#include <add_arg.h>
+#include <kintera/add_arg.h>
+#include <kintera/constants.h>
 
 namespace kintera {
 

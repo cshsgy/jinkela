@@ -9,14 +9,14 @@
 #include <torch/torch.h>
 
 // kintera
-#include "kintera/kinetics/kinetic_rate.hpp"
-#include "kintera/kinetics/kinetics_formatter.hpp"
-#include "kintera/kinetics/rate_constant.hpp"
-#include "kintera/kinetics/species_rate.hpp"
-#include "kintera/kintera_formatter.hpp"
-#include "kintera/reaction.hpp"
-#include "kintera/utils/parse_yaml.hpp"
-#include "kintera/utils/stoichiometry.hpp"
+#include <kintera/kinetics/kinetic_rate.hpp>
+#include <kintera/kinetics/kinetics_formatter.hpp>
+#include <kintera/kinetics/rate_constant.hpp>
+#include <kintera/kinetics/species_rate.hpp>
+#include <kintera/kintera_formatter.hpp>
+#include <kintera/reaction.hpp>
+#include <kintera/utils/parse_yaml.hpp>
+#include <kintera/utils/stoichiometry.hpp>
 
 int main(int argc, char* argv[]) {
   try {

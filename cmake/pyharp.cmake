@@ -6,4 +6,4 @@ set(REPO_URL "https://github.com/chengcli/pyharp")
 set(REPO_TAG "v1.3.3")
 
 add_package(${PACKAGE_NAME} ${REPO_URL} ${REPO_TAG} "" ON)
-include_directories(${elements_SOURCE_DIR})
+include_directories(${pyharp_SOURCE_DIR})

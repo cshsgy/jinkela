@@ -8,6 +8,7 @@ EquationOfStateImpl::EquationOfStateImpl(const EquationOfStateOptions& options_)
 torch::Tensor EquationOfStateImpl::get_gamma(torch::Tensor rho,
                                              torch::Tensor intEng) const {
   torch::autograd::AutoGradMode guard(true);
+  intEng.requires_grad_(true);
   auto temp = get_temp(rho, get_pres(rho, intEng));
 
   auto grad_output = torch::ones_like(temp);
