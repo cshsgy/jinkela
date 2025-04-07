@@ -70,7 +70,7 @@ message(STATUS "Include ${CMAKE_CURRENT_SOURCE_DIR}/cmake/parameters.cmake")
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/parameters.cmake)
 
 message(STATUS "${Blue}${PROJECT_NAME}-3. Setting up system libraries ...${ColorReset}")
-include(${CMAKE_SOURCE_DIR}/cmake/pyharp.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/pyharp.cmake)
 find_package(Torch REQUIRED)
 
 if (CUDA)
