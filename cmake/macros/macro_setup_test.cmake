@@ -23,14 +23,8 @@ macro(setup_test namel)
 
   target_link_libraries(
     ${namel}.${buildl}
-    PRIVATE kintera::kintera
-            gtest_main
-            ${TORCH_LIBRARY}
-            ${TORCH_CPU_LIBRARY}
-            ${C10_LIBRARY}
-            $<IF:$<BOOL:${CUDAToolkit_FOUND}>,kintera::kintera_cuda,>
-            $<IF:$<BOOL:${CUDAToolkit_FOUND}>,${TORCH_CUDA_LIBRARY},>
-            $<IF:$<BOOL:${CUDAToolkit_FOUND}>,${C10_CUDA_LIBRARY},>)
+    PRIVATE kintera::kintera gtest_main
+            $<IF:$<BOOL:${CUDAToolkit_FOUND}>,kintera::kintera_cu,>)
 
   add_test(NAME ${namel}.${buildl} COMMAND ${namel}.${buildl})
 endmacro()

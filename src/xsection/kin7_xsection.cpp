@@ -1,12 +1,10 @@
-// harp
-#include <harp/math/interpolation.hpp>
-
 // kintera
+#include "kin7_xsection.hpp"
+
+#include <kintera/math/interpolation.hpp>
 #include <kintera/reaction.hpp>
 #include <kintera/utils/find_resource.hpp>
 #include <kintera/utils/parse_comp_string.hpp>
-
-#include "kin7_xsection.hpp"
 
 namespace kintera {
 
@@ -132,8 +130,7 @@ torch::Tensor Kin7XsectionImpl::forward(torch::Tensor wave, torch::Tensor aflux,
   int nbranch = options.branches().size();
   int nspecies = options.species().size();
 
-  auto data =
-      harp::interpn({wave}, {kwave}, kdata).view({nwave, 1, 1, nbranch});
+  auto data = interpn({wave}, {kwave}, kdata).view({nwave, 1, 1, nbranch});
 
   // save the total cross section
   // (nreaction, nwave, ncol, nlyr)

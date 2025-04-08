@@ -7,17 +7,18 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(CUDA "Enable CUDA support" OFF)
 option(BUILD_TESTS "Build tests" ON)
 option(BUILD_EXAMPLES "Build examples" OFF)
+option(BUILD_HARP "Build harp" OFF)
 
 if (CUDA)
   project(
     kintera
     LANGUAGES CXX C CUDA
-    DESCRIPTION "Python-CUDA extension for disort library")
+    DESCRIPTION "library for chemistry and equation of state")
 else()
   project(
     kintera
     LANGUAGES CXX C
-    DESCRIPTION "Python extension for disort library")
+    DESCRIPTION "library for chemistry and equation of state")
 endif()
 
 # search for <Package>_ROOT
@@ -70,7 +71,14 @@ message(STATUS "Include ${CMAKE_CURRENT_SOURCE_DIR}/cmake/parameters.cmake")
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/parameters.cmake)
 
 message(STATUS "${Blue}${PROJECT_NAME}-3. Setting up system libraries ...${ColorReset}")
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/pyharp.cmake)
+if (BUILD_HARP)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/pyharp.cmake)
+else()
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/elements.cmake)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/yamlpp.cmake)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/gtest.cmake)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/fmt.cmake)
+endif()
 find_package(Torch REQUIRED)
 
 if (CUDA)
