@@ -48,14 +48,22 @@ set_target_properties(${namel}_${buildl}
 
 target_link_libraries(${namel}_${buildl}
     PUBLIC
-    pyharp::harp
+    $<IF:$<BOOL:${BUILD_HARP}>,pyharp::harp,elements::elements>
+    $<IF:$<BOOL:${BUILD_HARP}>,,fmt::fmt>
+    $<IF:$<BOOL:${BUILD_HARP}>,,yaml-cpp::yaml-cpp>
+    ${TORCH_LIBRARY}
+    ${TORCH_CPU_LIBRARY}
+    ${C10_LIBRARY}
     )
 
 add_library(kintera::kintera ALIAS ${namel}_${buildl})
 
 # CUDA source codes
 if (CUDAToolkit_FOUND)
-  file(GLOB cu_src_files *.cu)
+  file(GLOB cu_src_files
+    *.cu
+    eos/*.cu
+    )
 
   add_library(${namel}_cuda_${buildl}
       STATIC
@@ -69,8 +77,10 @@ if (CUDAToolkit_FOUND)
 
   target_link_libraries(${namel}_cuda_${buildl}
       PUBLIC
-      $<IF:$<BOOL:${CUDAToolkit_FOUND}>,CUDA::cudart,>
-      $<IF:$<BOOL:${CUDAToolkit_FOUND}>,CUDA::cudart_static,>
+      CUDA::cudart
+      CUDA::cudart_static
+      ${TORCH_CUDA_LIBRARY}
+      ${C10_CUDA_LIBRARY}
       )
 
   add_library(kintera::kintera_cu ALIAS ${namel}_cuda_${buildl})

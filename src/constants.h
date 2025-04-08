@@ -1,10 +1,7 @@
 #pragma once
 
-// harp
-#include <harp/constants.h>
-
 namespace kintera {
 namespace constants {
-using harp::constants::Rgas;
+double const Rgas = 8.314462;
 }
 }  // namespace kintera
