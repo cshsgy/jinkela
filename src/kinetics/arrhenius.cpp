@@ -111,6 +111,43 @@ torch::Tensor ArrheniusImpl::forward(
          Ea_R.view({1, 1, -1}) / T.unsqueeze(-1);
 }
 
+torch::Tensor ArrheniusImpl::jacobian(
+    torch::Tensor conc, torch::Tensor reaction_rate, torch::Tensor stoich, 
+    std::vector<std::string> const& species) {
+  auto ncol = conc.size(0);
+  auto nlyr = conc.size(1);
+  auto nspecies = conc.size(2);
+  
+  auto jac = torch::zeros({ncol, nlyr, nspecies, nspecies}, conc.options());
+  
+  for (int64_t i = 0; i < nspecies; ++i) {
+    for (int64_t j = 0; j < nspecies; ++j) {
+      auto drdc = torch::zeros({ncol, nlyr, reaction_rate.size(2)}, conc.options());
+      for (int64_t r = 0; r < reaction_rate.size(2); ++r) {
+        auto reactant_stoich = stoich.index({0, r}).to(conc.device());
+        auto product_stoich = stoich.index({1, r}).to(conc.device());
+        auto net_stoich = product_stoich - reactant_stoich;
+        
+        if (reactant_stoich.index({j}).item<double>() != 0.0) {
+          auto factor = reactant_stoich.index({j}).item<double>() / conc.select(2, j);
+          drdc.select(2, r) = reaction_rate.select(2, r) * factor;
+        }
+      }
+      
+      for (int64_t r = 0; r < reaction_rate.size(2); ++r) {
+        auto reactant_stoich = stoich.index({0, r}).to(conc.device());
+        auto product_stoich = stoich.index({1, r}).to(conc.device());
+        auto net_stoich = product_stoich - reactant_stoich;
+        
+        jac.index({torch::indexing::Slice(), torch::indexing::Slice(), i, j}) += 
+            drdc.select(2, r) * net_stoich[i];
+      }
+    }
+  }
+  
+  return jac;
+}
+
 /*torch::Tensor ArrheniusRate::ddTRate(torch::Tensor T, torch::Tensor P) const {
     return (m_Ea_R * 1.0 / T + m_b) * 1.0 / T;
 }*/

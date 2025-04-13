@@ -67,6 +67,17 @@ class ArrheniusImpl : public torch::nn::Cloneable<ArrheniusImpl> {
    */
   torch::Tensor forward(torch::Tensor T,
                         std::map<std::string, torch::Tensor> const& other);
+                        
+  //! Compute the Jacobian matrix for species rates with respect to concentrations
+  /*!
+   * \param conc concentrations of species [kmol/m³], shape (ncol, nlyr, nspecies)
+   * \param reaction_rate reaction rates, shape (ncol, nlyr, nreactions)
+   * \param stoich stoichiometry tensor, shape (2, nreactions, nspecies)
+   * \param species list of species names
+   * \return Jacobian matrix, shape (ncol, nlyr, nspecies, nspecies)
+   */
+  torch::Tensor jacobian(torch::Tensor conc, torch::Tensor reaction_rate,
+                         torch::Tensor stoich, std::vector<std::string> const& species);
 };
 TORCH_MODULE(Arrhenius);
 

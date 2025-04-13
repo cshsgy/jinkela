@@ -42,6 +42,14 @@ class KineticRateImpl : public torch::nn::Cloneable<KineticRateImpl> {
    *        shape (ncol, nlyr, nreaction)
    */
   torch::Tensor forward(torch::Tensor conc, torch::Tensor log_rate_constant);
+  
+  //! Compute the Jacobian matrix for species rates with respect to concentrations
+  /*!
+   * \param conc concentrations of species [kmol/m³], shape (ncol, nlyr, nspecies)
+   * \param reaction_rate reaction rates, shape (ncol, nlyr, nreactions)
+   * \return Jacobian matrix, shape (ncol, nlyr, nspecies, nspecies)
+   */
+  torch::Tensor jacobian(torch::Tensor conc, torch::Tensor reaction_rate);
 };
 
 TORCH_MODULE(KineticRate);

@@ -93,18 +93,9 @@ int main(int argc, char* argv[]) {
     }
     std::cout << "\n";
 
-    // Calculate Jacobian with respect to concentrations
-    torch::Tensor jac =
-        torch::zeros({ncol, nlyr, nspecies, nspecies}, torch::kFloat64);
-    for (int64_t i = 0; i < nspecies; ++i) {
-      auto grad_outputs = torch::zeros_like(species_rate);
-      grad_outputs.select(-1, i) = 1.;
-
-      auto grads = torch::autograd::grad({species_rate}, {conc}, {grad_outputs},
-                                         true, true);
-      // At {i, j} is the gradient of spec i with respect to spec j
-      jac.select(-1, i) = grads[0];
-    }
+    // Calculate Jacobian with respect to concentrations using the new function
+    // instead of autograd
+    auto jac = kintera::species_jacobian(conc, reaction_rate, kinetics->stoich, kinetics->order);
 
     std::cout << "Jacobian with respect to concentrations:\n";
     for (int64_t i = 0; i < nspecies; ++i) {
@@ -114,6 +105,25 @@ int main(int argc, char* argv[]) {
       }
     }
     std::cout << "\n";
+
+    // Compare with autograd Jacobian for validation
+    std::cout << "Comparing with autograd Jacobian (for validation):\n";
+    torch::Tensor autograd_jac =
+        torch::zeros({ncol, nlyr, nspecies, nspecies}, torch::kFloat64);
+    for (int64_t i = 0; i < nspecies; ++i) {
+      auto grad_outputs = torch::zeros_like(species_rate);
+      grad_outputs.select(-1, i) = 1.;
+
+      auto grads = torch::autograd::grad({species_rate}, {conc}, {grad_outputs},
+                                         true, true);
+      // At {i, j} is the gradient of spec i with respect to spec j
+      autograd_jac.select(-1, i) = grads[0];
+    }
+
+    // Calculate max difference
+    auto diff = (jac - autograd_jac).abs().max().item<double>();
+    std::cout << "Max difference between function and autograd Jacobian: " 
+              << diff << "\n\n";
 
     return 0;
 
