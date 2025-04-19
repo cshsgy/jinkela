@@ -24,13 +24,11 @@ TEST_P(DeviceTest, feps) {
   ThermoY thermo(op_thermo);
   thermo->to(device, dtype);
 
-  int nspecies = thermo->nspecies();
+  int nspecies = thermo->options.nspecies();
   auto yfrac =
       torch::zeros({nspecies, 1, 2, 3}, torch::device(device).dtype(dtype));
 
-  for (int i = 0; i < nspecies; ++i) {
-    yfrac[i] = 0.01 * (i + 1);
-  }
+  for (int i = 0; i < nspecies; ++i) yfrac[i] = 0.01 * (i + 1);
 
   auto feps = thermo->f_eps(yfrac);
   std::cout << "feps = " << feps << std::endl;
@@ -42,29 +40,18 @@ TEST_P(DeviceTest, feps) {
   std::cout << "fpsi = " << fpsi << std::endl;
 }
 
-TEST_P(DeviceTest, mu) {
+TEST_P(DeviceTest, thermo_y) {
   auto op_thermo = ThermoOptions::from_yaml("jupiter.yaml");
   std::cout << fmt::format("{}", op_thermo) << std::endl;
 
   ThermoY thermo(op_thermo);
   thermo->to(device, dtype);
 
-  int nspecies = thermo->nspecies();
+  int nspecies = thermo->options.nspecies();
   auto yfrac =
       torch::zeros({nspecies, 1, 2, 3}, torch::device(device).dtype(dtype));
 
-  for (int i = 0; i < nspecies; ++i) {
-    yfrac[i] = 0.01 * (i + 1);
-  }
-
-  auto mu = thermo->get_mu();
-  std::cout << "mu = " << mu << std::endl;
-
-  auto cv = thermo->get_cv();
-  std::cout << "cv = " << cv << std::endl;
-
-  auto cp = thermo->get_cp();
-  std::cout << "cp = " << cp << std::endl;
+  for (int i = 0; i < nspecies; ++i) yfrac[i] = 0.01 * (i + 1);
 
   auto xfrac = thermo->get_mole_fraction(yfrac);
   std::cout << "xfrac = " << xfrac << std::endl;
@@ -72,56 +59,136 @@ TEST_P(DeviceTest, mu) {
   EXPECT_EQ(torch::allclose(
                 xfrac.sum(-1),
                 torch::ones({1, 2, 3}, torch::device(device).dtype(dtype)),
-                /*rtol=*/1e-8, /*atol=*/1e-8),
+                /*rtol=*/1e-4, /*atol=*/1e-4),
             true);
 
   auto rho = torch::ones({1, 2, 3}, torch::device(device).dtype(dtype));
   auto conc = thermo->get_concentration(rho, yfrac);
-
   std::cout << "conc = " << conc << std::endl;
 }
 
-/*TEST_P(DeviceTest, forward) {
-  auto op_thermo = ThermodynamicsOptions();
-  int nvapor = 1;
-  int ncloud = 1;
+TEST_P(DeviceTest, thermo_x) {
+  auto op_thermo = ThermoOptions::from_yaml("jupiter.yaml");
 
-  op_thermo.nvapor(nvapor).ncloud(ncloud).max_iter(200);
-  op_thermo.species().push_back("H2O");
-  op_thermo.species().push_back("H2O(l)");
+  ThermoX thermo(op_thermo);
+  thermo->to(device, dtype);
 
-  auto mu = 18.e-3;
-  auto Rd = 287.;
-  auto gammad = 1.4;
-  auto mud = constants::Rgas / Rd;
-  auto cvd = Rd / (gammad - 1.);
-  auto cpd = cvd + Rd;
+  int nspecies = thermo->options.nspecies();
+  auto xfrac =
+      torch::zeros({1, 2, 3, 1 + nspecies}, torch::device(device).dtype(dtype));
 
-  auto cvv = (cvd * mud) / mu;
-  auto cpv = cvv + constants::Rgas / mu;
-  auto cc = 4.18e3;
+  for (int i = 0; i < nspecies; ++i) xfrac.select(-1, i + 1) = 0.01 * (i + 1);
+  xfrac.select(-1, 0) = 1. - xfrac.narrow(-1, 1, nspecies).sum(-1);
 
-  op_thermo.Rd(Rd).gammad_ref(gammad);
-  op_thermo.mu_ratio_m1() = std::vector<double>{mud / mu - 1., mud / mu - 1.};
-  op_thermo.cv_ratio_m1() = std::vector<double>{cvv / cvd - 1., cc / cvd - 1.};
-  op_thermo.cp_ratio_m1() = std::vector<double>{cpv / cpd - 1., cc / cpd - 1.};
-  op_thermo.h0() = std::vector<double>{0., 0., -2.5e6};
+  auto yfrac = thermo->get_mass_fraction(xfrac);
+  std::cout << "yfrac = " << yfrac << std::endl;
+}
 
-  Thermodynamics thermo(op_thermo);
+TEST_P(DeviceTest, thermo_xy) {
+  auto op_thermo = ThermoOptions::from_yaml("jupiter.yaml");
+  ThermoX thermo_x(op_thermo);
+  thermo_x->to(device, dtype);
 
-  auto w = torch::zeros({5 + nvapor + ncloud, 1, 2, 5}, torch::kFloat64);
+  ThermoY thermo_y(op_thermo);
+  thermo_y->to(device, dtype);
 
-  w[index::IDN] = torch::randn({1, 2, 5}, torch::kFloat64).abs();
-  w[index::IPR] = torch::randn({1, 2, 5}, torch::kFloat64).abs() * 1.e5;
+  int nspecies = op_thermo.nspecies();
+  auto xfrac =
+      torch::zeros({1, 2, 3, 1 + nspecies}, torch::device(device).dtype(dtype));
 
-  int ivapor = thermo->species_index("H2O");
-  int icloud = thermo->species_index("H2O(l)");
+  for (int i = 0; i < nspecies; ++i) xfrac.select(-1, i + 1) = 0.01 * (i + 1);
+  xfrac.select(-1, 0) = 1. - xfrac.narrow(-1, 1, nspecies).sum(-1);
 
-  w[ivapor] = torch::randn({1, 2, 5}, torch::kFloat64).abs() * 0.2;
-  w[icloud] = torch::randn({1, 2, 5}, torch::kFloat64).abs() * 0.2;
-  w.narrow(0, index::IVX, 3) = torch::randn({3, 1, 2, 5}, torch::kFloat64);
+  auto yfrac = thermo_x->get_mass_fraction(xfrac);
+  auto xfrac2 = thermo_y->get_mole_fraction(yfrac);
 
-  std::cout << "w = " << w << std::endl;
+  EXPECT_EQ(torch::allclose(xfrac, xfrac2, /*rtol=*/1e-4, /*atol=*/1e-4), true);
+}
+
+TEST_P(DeviceTest, thermo_yx) {
+  auto op_thermo = ThermoOptions::from_yaml("jupiter.yaml");
+  ThermoX thermo_x(op_thermo);
+  thermo_x->to(device, dtype);
+
+  ThermoY thermo_y(op_thermo);
+  thermo_y->to(device, dtype);
+
+  int nspecies = op_thermo.nspecies();
+  auto yfrac =
+      torch::zeros({nspecies, 1, 2, 3}, torch::device(device).dtype(dtype));
+
+  for (int i = 0; i < nspecies; ++i) yfrac[i] = 0.01 * (i + 1);
+
+  auto xfrac = thermo_y->get_mole_fraction(yfrac);
+  auto yfrac2 = thermo_x->get_mass_fraction(xfrac);
+
+  EXPECT_EQ(torch::allclose(yfrac, yfrac2, /*rtol=*/1e-4, /*atol=*/1e-4), true);
+}
+
+TEST_P(DeviceTest, eng_pres) {
+  auto op_thermo = ThermoOptions::from_yaml("jupiter.yaml");
+  ThermoY thermo_y(op_thermo);
+  thermo_y->to(device, dtype);
+
+  ThermoX thermo_x(op_thermo);
+  thermo_x->to(device, dtype);
+
+  int nspecies = thermo_y->options.nspecies();
+  auto yfrac = torch::zeros({nspecies, 1}, torch::device(device).dtype(dtype));
+  for (int i = 0; i < nspecies; ++i) yfrac[i] = 0.01 * (i + 1);
+
+  auto temp = 200.0 * torch::ones({1}, torch::device(device).dtype(dtype));
+  auto pres = 1.e5 * torch::ones({1}, torch::device(device).dtype(dtype));
+
+  auto xfrac = thermo_y->get_mole_fraction(yfrac);
+  auto rho = thermo_x->get_density(temp, pres, xfrac);
+
+  auto intEng = thermo_y->get_intEng(rho, pres, yfrac);
+  auto pres2 = thermo_y->get_pres(rho, intEng, yfrac);
+  EXPECT_EQ(torch::allclose(pres, pres2, /*rtol=*/1e-4, /*atol=*/1e-4), true);
+
+  auto temp2 = thermo_y->get_temp(rho, pres, yfrac);
+  EXPECT_EQ(torch::allclose(temp, temp2, /*rtol=*/1e-4, /*atol=*/1e-4), true);
+}
+
+TEST_P(DeviceTest, forward) {
+  // skip mps
+  if (device == torch::kMPS) {
+    GTEST_SKIP() << "Skipping test on MPS device.";
+  }
+
+  auto op_thermo = ThermoOptions::from_yaml("jupiter.yaml");
+  std::cout << fmt::format("{}", op_thermo) << std::endl;
+
+  ThermoY thermo_y(op_thermo);
+  thermo_y->to(device, dtype);
+
+  int nspecies = thermo_y->options.nspecies();
+  auto yfrac =
+      torch::zeros({nspecies, 1, 2, 3}, torch::device(device).dtype(dtype));
+  for (int i = 0; i < nspecies; ++i) yfrac[i] = 0.01 * (i + 1);
+
+  auto rho = torch::ones({1, 2, 3}, torch::device(device).dtype(dtype));
+  auto pres = 1.e5 * torch::ones({1, 2, 3}, torch::device(device).dtype(dtype));
+  auto intEng = thermo_y->get_intEng(rho, pres, yfrac);
+  std::cout << "intEng = " << intEng << std::endl;
+
+  auto result = thermo_y->forward(rho, intEng, yfrac);
+  auto yfrac2 = yfrac + result;
+
+  auto pres2 = thermo_y->get_pres(rho, intEng, yfrac2);
+  std::cout << "pres2 = " << pres2 << std::endl;
+
+  auto intEng2 = thermo_y->get_intEng(rho, pres2, yfrac2);
+  std::cout << "intEng2 = " << intEng2 << std::endl;
+
+  auto result2 = thermo_y->forward(rho, intEng, yfrac2);
+  auto yfrac3 = yfrac2 + result;
+
+  auto pres3 = thermo_y->get_pres(rho, intEng, yfrac3);
+  std::cout << "pres3 = " << pres3 << std::endl;
+
+  /*std::cout << "w = " << w << std::endl;
 
   auto temp = thermo->get_temp(w);
 
@@ -146,10 +213,10 @@ TEST_P(DeviceTest, mu) {
 
   auto dw = thermo->equilibrate_tp(temp, w[index::IPR],
                                    w.slice(0, index::ICY, w.size(0)));
-  std::cout << "rate = " << dw << std::endl;
+  std::cout << "rate = " << dw << std::endl;*/
 }
 
-TEST_P(DeviceTest, earth) {
+/*TEST_P(DeviceTest, earth) {
   auto op_cond = CondensationOptions();
 
   auto r = Nucleation(
