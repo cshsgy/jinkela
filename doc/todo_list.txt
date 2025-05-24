@@ -1,0 +1,6 @@
+1. A quick solver that uses reaction rates and jacobians to solve the DE systems
+1-1. Explicit: simple, loaded with actual rates, update rates
+1-2. Implicit: simple, loaded with actual rate calc+jacobians
+1-3. Use a small time step to do sanity check of Explicit vs. Implicit solvers, include as a test.
+2. Inclusion of photochemistry (actinic flux + photodissociation)
+3. Coupling with vertical mixing

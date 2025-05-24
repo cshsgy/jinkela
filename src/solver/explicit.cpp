@@ -14,7 +14,6 @@ void explicit_solve(
     double max_rel_change) {
     auto stoich_t = stoich_matrix.t();
     
-    // Expand stoich_t to match the batch dimensions of rates
     std::vector<int64_t> expand_shape;
     for (int64_t i = 0; i < rates.dim() - 1; ++i) {
         expand_shape.push_back(rates.size(i));
