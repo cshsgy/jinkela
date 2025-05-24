@@ -1,17 +1,23 @@
-#include "explicit.h"
+// kintera
+#include "../kinetics/reaction_system.hpp"
+#include "explicit.hpp"
+
+// torch
 #include <torch/torch.h>
 #include <iostream>
 
 namespace kintera {
 
-// TODO: Use a solver base class
-
-void explicit_solve(
+void ExplicitSolver::time_march(
     torch::Tensor& C,
-    const torch::Tensor& rates,
-    const torch::Tensor& stoich_matrix,
+    const torch::Tensor& P,
+    const torch::Tensor& Temp,
     double dt,
-    double max_rel_change) {
+    ReactionSystem& reaction_system) {
+    
+    auto rates = reaction_system.calculate_rates(C, P, Temp);
+    auto stoich_matrix = reaction_system.get_stoichiometry_matrix();
+    
     auto stoich_t = stoich_matrix.t();
     
     std::vector<int64_t> expand_shape;
@@ -25,19 +31,18 @@ void explicit_solve(
     auto rates_reshaped = rates.unsqueeze(-1);
     auto dC = torch::matmul(stoich_expanded, rates_reshaped).squeeze(-1);
     auto abs_rel_changes = (dC * dt).abs() / (C + 1e-30);
-    auto max_change = abs_rel_changes.max().item<double>();
+    auto max_change = abs_rel_changes.max().template item<double>();
     
     // Limit timestep if necessary
     double actual_dt = dt;
-    if (max_change > max_rel_change) {
-        std::cout << "Limiting timestep from " << dt << " to " << dt * (max_rel_change / max_change) << std::endl;
-        actual_dt = dt * (max_rel_change / max_change);
+    if (max_change > this->max_rel_change_) {
+        std::cout << "Limiting timestep from " << dt << " to " 
+                 << dt * (this->max_rel_change_ / max_change) << std::endl;
+        actual_dt = dt * (this->max_rel_change_ / max_change);
     }
     
     C += dC * actual_dt;
-    
-    // Ensure non-negativity; should be ensured, prevent numerical errors
-    C.clamp_(0);
+    C.clamp_(0);  // Ensure non-negativity
 }
 
 } // namespace kintera

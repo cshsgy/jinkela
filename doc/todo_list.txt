@@ -4,3 +4,5 @@
 1-3. Use a small time step to do sanity check of Explicit vs. Implicit solvers, include as a test.
 2. Inclusion of photochemistry (actinic flux + photodissociation)
 3. Coupling with vertical mixing
+
+4. (Future) Backward solver using checkpointed reaction rate constants saved (since they should be the standard outputs). The reaction rates should uniquely complement for the lost information and support the backward differential equation solving.
