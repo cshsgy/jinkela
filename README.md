@@ -5,5 +5,9 @@ These cache files can  be safely deleted at any time.
 Internet connection is required for the first build and whenever after the cache is deleted.
 Once the cache is populated, the build process can be repeated offline.
 
+## TODO
+- [ ] EOS
+- [ ] Python bindings
+
 ### Staying Updated
 If you have forked this repository, please enable notifications or watch for updates!
