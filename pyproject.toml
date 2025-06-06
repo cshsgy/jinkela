@@ -10,10 +10,11 @@ authors = [
   { name="Sihe Chen", email="sihechen@caltech.edu"},
   { name="Cheng Li", email="chengcli@umich.edu" }
 ]
-license = { text = "MIT" }
+license = { text = "LICENSE" }
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
+  "numpy",
   "pyharp>=1.6.4",
 ]
 classifiers = [

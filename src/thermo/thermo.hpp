@@ -10,9 +10,9 @@
 #include <torch/nn/modules/container/any.h>
 
 // kintera
-#include <kintera/utils/func1.hpp>
+#include <kintera/utils/func2.hpp>
 
-#include "thermo_reactions.hpp"
+#include "nucleation.hpp"
 
 // arg
 #include <kintera/add_arg.h>
@@ -59,8 +59,10 @@ struct ThermoOptions {
   ADD_ARG(std::vector<double>, cref_R);
   ADD_ARG(std::vector<double>, uref_R);
 
-  ADD_ARG(std::vector<user_func1>, intEng_extra);
-  ADD_ARG(std::vector<user_func1>, cv_extra);
+  ADD_ARG(std::vector<user_func2>, intEng_R_extra);
+  ADD_ARG(std::vector<user_func2>, cv_R_extra);
+  ADD_ARG(std::vector<user_func2>, cp_R_extra);
+  ADD_ARG(std::vector<user_func2>, compress_z);
 
   ADD_ARG(std::vector<Nucleation>, react);
   ADD_ARG(std::vector<std::string>, species);
@@ -174,6 +176,10 @@ class ThermoYImpl : public torch::nn::Cloneable<ThermoYImpl> {
   torch::Tensor _conc_to_yfrac(
       torch::Tensor conc,
       torch::optional<torch::Tensor> out = torch::nullopt) const;
+
+  //! \brief calculate heat capacity
+  torch::Tensor _cv(torch::Tensor rho, torch::Tensor pres,
+                    torch::Tensor yfrac) const;
 };
 TORCH_MODULE(ThermoY);
 
@@ -229,6 +235,13 @@ class ThermoXImpl : public torch::nn::Cloneable<ThermoXImpl> {
    */
   torch::Tensor _xfrac_to_yfrac(torch::Tensor xfrac) const;
 
+  //! \brief Calculate concentration from mole fraction
+  /*
+   * $ C_i = \frac{x_i P}{R_d T_v} $
+   */
+  torch::Tensor _xfrac_to_conc(torch::Tensor temp, torch::Tensor pres,
+                               torch::Tensor xfrac) const;
+
   //! \brief Calculate density from temperature, pressure and mole fraction
   /*!
    * Eq.94 in Li2019
@@ -240,6 +253,15 @@ class ThermoXImpl : public torch::nn::Cloneable<ThermoXImpl> {
    */
   torch::Tensor _temp_to_dens(torch::Tensor temp, torch::Tensor pres,
                               torch::Tensor xfrac) const;
+
+  //! \brief calculate enthalpy
+  torch::Tensor _temp_to_enthalpy(
+      torch::Tensor temp, torch::Tensor conc,
+      torch::optional<torch::Tensor> out = torch::nullopt) const;
+
+  //! \brief calculatec cp
+  torch::Tensor _cp(torch::Tensor temp, torch::Tensor conc,
+                    torch::optional<torch::Tensor> out = torch::nullopt) const;
 };
 TORCH_MODULE(ThermoX);
 

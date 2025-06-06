@@ -1,91 +1,85 @@
 // C/C++
-#include <algorithm>
-#include <iomanip>
-#include <iostream>
+#include <cmath>
+#include <string>
 
-// cantera
-#include <cantera/kinetics.h>
-#include <cantera/kinetics/Condensation.h>
-#include <cantera/thermo.h>
+// kintera
+#include <kintera/constants.h>
 
-// thermodynamics
-#include "thermodynamics.hpp"
+#include "cal_dlnT_dlnP_impl.h"
+#include "thermo.hpp"
+
+namespace kintera {
 
 template <typename T>
-void integrate_z(T* q, T dz, std::string method, T grav, T adTdz) {
-  auto& thermo = kinetics_->thermo();
+void integrate_z(T* xfrac, T* temp, T* pres, T* mu, T dz, char const* method,
+                 T grav, T adTdz, T const* stoich, int nspecies, int ngas,
+                 T const* enthalpy, T const* cp, user_func1 const* logsvp_func,
+                 float logsvp_eps, int* max_iter) {
+  T* latent = (T*)malloc(ngas * sizeof(T));
+  T* cp_ratio = (T*)malloc(nspecies * sizeof(T));
+  memset(latent, 0, ngas * sizeof(T));
 
-  T step[] = {0.5, 0.5, 1.};
-  T dTdz[4], chi[4];
-  T latent[1 + NVAPOR];
-  T cp_ratio_mole[Size];
-
-  std::array<Real, Size> enthalpy;
-  std::array<Real, Size> xfrac;
-
-  Real temp0 = thermo.temperature();
-  Real pres0 = thermo.pressure();
-
-  for (int i = 0; i < Size; ++i) {
-    cp_ratio_mole[i] = cp_ratio_[i] / inv_mu_ratio_[i];
+  for (int i = 0; i < nspecies; ++i) {
+    cp_ratio[i] = cp[i] / cp[0];
   }
 
-  for (int rk = 0; rk < 4; ++rk) {
-    thermo.getMoleFractions(xfrac.data());
-    thermo.getEnthalpy_RT(enthalpy.data());
-
-    for (int i = 1; i <= NVAPOR; ++i) {
-      if (xfrac[i + NVAPOR] > 0.) {
-        latent[i] = enthalpy[i] - enthalpy[i + NVAPOR];
-      } else {
-        latent[i] = 0.;
+  // This only considers the first (ngas-1) reactions
+  for (int i = 1; i < ngas; ++i) {
+    for (int j = 0; j < nspecies; ++j) {  // find out condensates
+      if (stoich[j * (ngas - 1) + (i - 1)] > 0 || xfrac[j] > 0.) {
+        latent[i] -= enthalpy[j];
       }
     }
-
-    Real q_gas = 1., q_eps = 1.;
-    for (int i = 1; i <= NVAPOR; ++i) {
-      q_eps += xfrac[i] * (1. / inv_mu_ratio_[i] - 1.);
-    }
-
-    for (int j = 1 + NVAPOR; j < Size; ++j) {
-      q_eps += xfrac[j] * (1. / inv_mu_ratio_[j] - 1.);
-      q_gas += -xfrac[j];
-    }
-
-    Real g_ov_Rd = grav / Rd_;
-    Real R_ov_Rd = q_gas / q_eps;
-
-    if (method == "reversible" || method == "pseudo") {
-      chi[rk] = cal_dlnT_dlnP(xfrac.data(), gammad_, cp_ratio_mole, latent);
-    } else if (method == "dry") {
-      for (int i = 1; i <= NVAPOR; ++i) latent[i] = 0;
-      chi[rk] = cal_dlnT_dlnP(xfrac.data(), gammad_, cp_ratio_mole, latent);
-    } else {  // isothermal
-      chi[rk] = 0.;
-    }
-
-    dTdz[rk] = -chi[rk] * g_ov_Rd / R_ov_Rd + adTdz;
-    chi[rk] = -R_ov_Rd / g_ov_Rd * dTdz[rk];
-
-    // integrate over dz
-    Real chi_avg, temp, pres;
-    if (rk < 3) {
-      temp = temp0 + dTdz[rk] * dz * step[rk];
-      chi_avg = chi[rk];
-    } else {
-      temp = temp0 +
-             1. / 6. * (dTdz[0] + 2. * dTdz[1] + 2. * dTdz[2] + dTdz[3]) * dz;
-      chi_avg = 1. / 6. * (chi[0] + 2. * chi[1] + 2. * chi[2] + chi[3]);
-    }
-
-    if (!(temp > 0.)) temp = temp0;
-
-    if (fabs(temp - temp0) > 0.01) {
-      pres = pres0 * pow(temp / temp0, 1. / chi_avg);
-    } else {  // isothermal limit
-      pres = pres0 * exp(-2. * g_ov_Rd * dz / (R_ov_Rd * (temp + temp0)));
-    }
-
-    EquilibrateTP(temp, pres);
+    if (latent[i] < 0.) latent[i] += enthalpy[i];
   }
+
+  T xgas = 1., xeps = 1.;
+  for (int i = 1; i < ngas; ++i) {
+    xeps += xfrac[i] * (mu[i] / mu[0] - 1.);
+  }
+
+  for (int i = ngas; i < nspecies; ++i) {
+    xeps += xfrac[i] * (mu[i] / mu[0] - 1.);
+    xgas += -xfrac[i];
+  }
+
+  T Rd = constants::Rgas / mu[0];  // molar gas constant
+  T g_ov_Rd = grav / Rd;
+  T R_ov_Rd = xgas / xeps;
+  T gammad = cp[0] / (cp[0] - Rd);  // adiabatic index
+  T chi = 0.;
+
+  if (strcmp(method, "reversible") == 0 || strcmp(method, "pseudo") == 0) {
+    chi = cal_dlnT_dlnP(xfrac, gammad, cp_ratio, latent, ngas - 1,
+                        nspecies - ngas);
+  } else if (strcmp(method, "dry") == 0) {
+    for (int i = 1; i < ngas; ++i) latent[i] = 0;
+    chi = cal_dlnT_dlnP(xfrac, gammad, cp_ratio, latent, ngas - 1,
+                        nspecies - ngas);
+  } else {  // isothermal
+    chi = 0.;
+  }
+
+  T dTdz = -chi * g_ov_Rd / R_ov_Rd + adTdz;
+  chi = -R_ov_Rd / g_ov_Rd * dTdz;
+
+  // integrate over dz
+  T temp0 = *temp;
+  (*temp) += dTdz * dz;
+
+  if (!(temp > 0.)) (*temp) = temp0;
+
+  if (fabs((*temp) - temp0) > 0.01) {
+    (*pres) *= pow(temp / temp0, 1. / chi);
+  } else {  // isothermal limit
+    (*pres) *= exp(-2. * g_ov_Rd * dz / (R_ov_Rd * (temp + temp0)));
+  }
+
+  equilibrate_tp(xfrac, *temp, *pres, stoich, nspecies, ngas - 1, ngas,
+                 user_func1 logsvp_func, logsvp_eps, max_iter);
+
+  free(latent);
+  free(cp_ratio);
 }
+
+}  // namespace kintera

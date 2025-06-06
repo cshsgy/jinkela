@@ -8,9 +8,9 @@ namespace kintera {
 void call_equilibrate_uv_cpu(at::TensorIterator &iter,
                              user_func1 const *logsvp_func,
                              user_func1 const *logsvp_func_ddT,
-                             user_func1 const *intEng_extra,
-                             user_func1 const *intEng_extra_ddT,
-                             float logsvp_eps, int max_iter);
+                             user_func2 const *intEng_R_extra,
+                             user_func2 const *cv_R_extra, float logsvp_eps,
+                             int max_iter);
 
 ThermoYImpl::ThermoYImpl(const ThermoOptions &options_) : options(options_) {
   int nvapor = options.vapor_ids().size();
@@ -28,13 +28,21 @@ ThermoYImpl::ThermoYImpl(const ThermoOptions &options_) : options(options_) {
     options.uref_R() = std::vector<double>(nvapor + ncloud, 0.);
   }
 
-  // populate higher-order internal energy and cv functions
-  while (options.intEng_extra().size() < options.species().size()) {
-    options.intEng_extra().push_back(nullptr);
+  // populate higher-order thermodynamic functions
+  while (options.intEng_R_extra().size() < options.species().size()) {
+    options.intEng_R_extra().push_back(nullptr);
   }
 
-  while (options.cv_extra().size() < options.species().size()) {
-    options.cv_extra().push_back(nullptr);
+  while (options.cv_R_extra().size() < options.species().size()) {
+    options.cv_R_extra().push_back(nullptr);
+  }
+
+  while (options.cp_R_extra().size() < options.species().size()) {
+    options.cp_R_extra().push_back(nullptr);
+  }
+
+  while (options.compress_z().size() <= nvapor) {
+    options.compress_z().push_back(nullptr);
   }
 
   reset();
@@ -124,6 +132,7 @@ torch::Tensor ThermoYImpl::compute(std::string ab,
   } else if (ab == "DTY->P") {
     out =
         _temp_to_pres(*args.begin(), *(args.begin() + 1), *(args.begin() + 2));
+  } else if (ab == "DPY->cv") {
   } else {
     TORCH_CHECK(false, "Unknown abbreviation: ", ab);
   }
@@ -178,8 +187,8 @@ torch::Tensor ThermoYImpl::forward(torch::Tensor rho, torch::Tensor intEng,
   // call the equilibrium solver
   if (conc.is_cpu()) {
     call_equilibrate_uv_cpu(
-        iter, logsvp_func, logsvp_func_ddT, options.intEng_extra().data(),
-        options.cv_extra().data(), options.ftol(), options.max_iter());
+        iter, logsvp_func, logsvp_func_ddT, options.intEng_R_extra().data(),
+        options.cv_R_extra().data(), options.ftol(), options.max_iter());
   } else if (conc.is_cuda()) {
     TORCH_CHECK(false, "CUDA support not implemented yet");
   } else {

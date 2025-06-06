@@ -1,4 +1,6 @@
 // kintera
+#include <kintera/constants.h>
+
 #include "thermo.hpp"
 
 namespace kintera {
@@ -21,6 +23,23 @@ ThermoXImpl::ThermoXImpl(const ThermoOptions &options_) : options(options_) {
 
   if (options.uref_R().empty()) {
     options.uref_R() = std::vector<double>(nvapor + ncloud, 0.);
+  }
+
+  // populate higher-order thermodynamic functions
+  while (options.intEng_R_extra().size() < options.species().size()) {
+    options.intEng_R_extra().push_back(nullptr);
+  }
+
+  while (options.cv_R_extra().size() < options.species().size()) {
+    options.cv_R_extra().push_back(nullptr);
+  }
+
+  while (options.cp_R_extra().size() < options.species().size()) {
+    options.cp_R_extra().push_back(nullptr);
+  }
+
+  while (options.compress_z().size() <= nvapor) {
+    options.compress_z().push_back(nullptr);
   }
 
   reset();
@@ -86,9 +105,15 @@ torch::Tensor ThermoXImpl::compute(std::string ab,
                                    torch::optional<torch::Tensor> out) const {
   if (ab == "X->Y") {
     out = _xfrac_to_yfrac(*args.begin());
+  } else if (ab == "TPX->C") {
+    out = _xfrac_to_conc(*args.begin(), *(args.begin() + 1));
   } else if (ab == "TPX->D") {
     out =
         _temp_to_dens(*args.begin(), *(args.begin() + 1), *(args.begin() + 2));
+  } else if (ab == "TC->H") {
+    out = _temp_to_enthalpy(*args.begin(), *(args.begin() + 1), out);
+  } else if (ab == "TC->cp") {
+    out = _cp(*args.begin(), *(args.begin() + 1), out);
   } else {
     TORCH_CHECK(false, "Unknown abbreviation: ", ab);
   }
@@ -165,6 +190,25 @@ torch::Tensor ThermoXImpl::_xfrac_to_yfrac(torch::Tensor xfrac) const {
   yfrac.permute(vec) = xfrac.narrow(-1, 1, nmass) * (mu_ratio_m1 + 1.);
   auto sum = 1. + xfrac.narrow(-1, 1, nmass).matmul(mu_ratio_m1);
   return yfrac / sum.unsqueeze(0);
+}
+
+torch::Tensor ThermoXImpl::_xfrac_to_conc(torch::Tensor temp,
+                                          torch::Tensor pres,
+                                          torch::Tensor xfrac) const {
+  auto nvapor = options.vapor_ids().size();
+  auto ncloud = options.cloud_ids().size();
+
+  auto gas_conc = pres / (temp * constants::Rgas);
+  auto xgas = 1. - xfrac.narrow(-1, 1 + nvapor, ncloud).sum(-1);
+
+  auto conc = torch::empty_like(xfrac);
+  conc.narrow(-1, 0, 1 + nvapor) =
+      gas_conc * xfrac.narrow(-1, 0, 1 + nvapor) / xgas.unsqueeze(-1);
+  conc.narrow(-1, 1 + nvapor, ncloud) = xfrac.narrow(-1, 1 + nvapor, ncloud) /
+                                        xfrac.select(-1, 0).unsqueeze(-1) *
+                                        conc.select(-1, 0).unsqueeze(-1);
+
+  return conc;
 }
 
 }  // namespace kintera

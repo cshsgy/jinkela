@@ -9,6 +9,7 @@
 #include <kintera/math/mmdot.h>
 
 #include <kintera/utils/func1.hpp>
+#include <kintera/utils/func2.hpp>
 
 namespace kintera {
 
@@ -23,31 +24,31 @@ namespace kintera {
  * \param[in,out] temp in: initial temperature, out: adjusted temperature.
  * \param[in,out] conc in: initial concentrations for each species, out:
  * adjusted concentrations.
- * \param[in] h0 initial enthalpy.
+ * \param[in] h0 initial internal energy.
  * \param[in] stoich reaction stoichiometric matrix, nspecies x nreaction.
  * \param[in] nspecies number of species in the system.
  * \param[in] nreaction number of reactions in the system.
- * \param[in] enthalpy_offset offset for enthalpy calculations.
- * \param[in] cp_const const component of heat capacity.
+ * \param[in] intEng_offset offset for internal energy calculations.
+ * \param[in] cv_const const component of heat capacity.
  * \param[in] logsvp_func user-defined functions for logarithm of saturation
  * vapor pressure.
  * \param[in] logsvp_func_ddT user-defined functions for derivative of logsvp
- *            with respect to temperature.
- * \param[in] enthalpy_extra user-defined functions for enthalpy calculation
- *            in addition to the linear term.
- * \param[in] enthalpy_extra_ddT user-defined functions for enthalpy derivative
- *            with respect to temperature in addition to the constant term.
+ * with respect to temperature.
+ * \param[in] intEng_R_extra user-defined functions for internal energy
+ * calculation in addition to the linear term.
+ * \param[in] cv_R_extra user-defined functions for heat capacity calculation in
+ * addition to the constant term.
  * \param[in] lnsvp_eps tolerance for convergence in logarithm of saturation
  * vapor pressure.
  * \param[in,out] max_iter maximum number of iterations allowed for convergence.
  */
 template <typename T>
 int equilibrate_uv(T *temp, T *conc, T h0, T const *stoich, int nspecies,
-                   int nreaction, T const *enthalpy_offset, T const *cp_const,
+                   int nreaction, T const *intEng_offset, T const *cv_const,
                    user_func1 const *logsvp_func,
                    user_func1 const *logsvp_func_ddT,
-                   user_func1 const *enthalpy_extra,
-                   user_func1 const *enthalpy_extra_ddT, float logsvp_eps,
+                   user_func2 const *intEng_R_extra,
+                   user_func2 const *cv_R_extra, float logsvp_eps,
                    int *max_iter) {
   // check positive temperature
   if (*temp <= 0) {
@@ -72,14 +73,14 @@ int equilibrate_uv(T *temp, T *conc, T h0, T const *stoich, int nspecies,
 
   // check non-negative cp
   for (int i = 0; i < nspecies; i++) {
-    if (cp_const[i] < 0) {
+    if (cv_const[i] < 0) {
       fprintf(stderr, "Error: Negative heat capacity for species %d.\n", i);
       return 1;  // error: negative heat capacity
     }
   }
 
-  T *enthalpy = (T *)malloc(nspecies * sizeof(T));
-  T *enthalpy_ddT = (T *)malloc(nspecies * sizeof(T));
+  T *intEng = (T *)malloc(nspecies * sizeof(T));
+  T *intEng_ddT = (T *)malloc(nspecies * sizeof(T));
   T *logsvp = (T *)malloc(nreaction * sizeof(T));
   T *logsvp_ddT = (T *)malloc(nreaction * sizeof(T));
 
@@ -98,15 +99,15 @@ int equilibrate_uv(T *temp, T *conc, T h0, T const *stoich, int nspecies,
     reaction_set[i] = i;
   }
 
-  // evaluate enthalpy and its derivative
+  // evaluate internal energy and its derivative (cv)
   for (int i = 0; i < nspecies; i++) {
-    enthalpy[i] = enthalpy_offset[i] + cp_const[i] * (*temp);
-    if (enthalpy_extra[i]) {
-      enthalpy[i] += enthalpy_extra[i](*temp);
+    intEng[i] = intEng_offset[i] + cv_const[i] * (*temp);
+    if (intEng_R_extra[i]) {
+      intEng[i] += intEng_R_extra[i](*temp, conc[i]) * constants::Rgas;
     }
-    enthalpy_ddT[i] = cp_const[i];
-    if (enthalpy_extra_ddT[i]) {
-      enthalpy_ddT[i] += enthalpy_extra_ddT[i](*temp);
+    intEng_ddT[i] = cv_const[i];
+    if (cv_R_extra[i]) {
+      intEng_ddT[i] += cv_R_extra[i](*temp, conc[i]) * constants::Rgas;
     }
   }
 
@@ -131,7 +132,7 @@ int equilibrate_uv(T *temp, T *conc, T h0, T const *stoich, int nspecies,
     // calculate heat capacity
     T heat_capacity = 0.0;
     for (int i = 0; i < nspecies; i++) {
-      heat_capacity += enthalpy_ddT[i] * conc[i];
+      heat_capacity += intEng_ddT[i] * conc[i];
     }
 
     // populate weight matrix, rhs vector and active set
@@ -211,18 +212,18 @@ int equilibrate_uv(T *temp, T *conc, T h0, T const *stoich, int nspecies,
       T zh = 0.;
       T zc = 0.;
 
-      // re-evaluate enthalpy and its derivative
+      // re-evaluate internal energy and its derivative
       for (int i = 0; i < nspecies; i++) {
-        enthalpy[i] = enthalpy_offset[i] + cp_const[i] * (*temp);
-        if (enthalpy_extra[i]) {
-          enthalpy[i] += enthalpy_extra[i](*temp);
+        intEng[i] = intEng_offset[i] + cp_const[i] * (*temp);
+        if (intEng_R_extra[i]) {
+          intEng[i] += intEng_R_extra[i](*temp, conc[i]) * constants::Rgas;
         }
-        enthalpy_ddT[i] = cp_const[i];
-        if (enthalpy_extra_ddT[i]) {
-          enthalpy_ddT[i] += enthalpy_extra_ddT[i](*temp);
+        intEng_ddT[i] = cp_const[i];
+        if (cv_R_extra[i]) {
+          intEng_ddT[i] += cv_R_extra[i](*temp, conc[i]) * constant::Rgas;
         }
-        zh += enthalpy[i] * conc[i];
-        zc += enthalpy_ddT[i] * conc[i];
+        zh += intEng[i] * conc[i];
+        zc += intEng_ddT[i] * conc[i];
       }
 
       temp0 = *temp;
@@ -236,8 +237,8 @@ int equilibrate_uv(T *temp, T *conc, T h0, T const *stoich, int nspecies,
     }
   }
 
-  free(enthalpy);
-  free(enthalpy_ddT);
+  free(intEng);
+  free(intEng_ddT);
   free(logsvp);
   free(logsvp_ddT);
   free(weight);
