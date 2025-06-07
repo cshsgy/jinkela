@@ -120,6 +120,8 @@ torch::Tensor ThermoYImpl::compute(std::string ab,
     out = _yfrac_to_xfrac(*args.begin());
   } else if (ab == "DY->C") {
     out = _yfrac_to_conc(*args.begin(), *(args.begin() + 1));
+  } else if (ab == "DY->cv") {
+    out = _cv_mean(*args.begin(), *(args.begin() + 1), out);
   } else if (ab == "DPY->U") {
     out = _pres_to_intEng(*args.begin(), *(args.begin() + 1),
                           *(args.begin() + 2));
@@ -132,7 +134,6 @@ torch::Tensor ThermoYImpl::compute(std::string ab,
   } else if (ab == "DTY->P") {
     out =
         _temp_to_pres(*args.begin(), *(args.begin() + 1), *(args.begin() + 2));
-  } else if (ab == "DPY->cv") {
   } else {
     TORCH_CHECK(false, "Unknown abbreviation: ", ab);
   }
@@ -305,6 +306,29 @@ torch::Tensor ThermoYImpl::_conc_to_yfrac(
              conc.narrow(-1, 1, ny).matmul(mu_ratio_m1 / (mu_ratio_m1 + 1.));
   yfrac /= sum.unsqueeze(0);
   return yfrac;
+}
+
+torch::Tensor ThermoYImpl::_cv_mean(
+    torch::Tensor rho, torch::Tensor yfrac,
+    torch::optional<torch::Tensor> out = torch::nullopt) const {
+  int ny = yfrac.size(-1);
+  auto conc = _yfrac_to_conc(rho, yfrac);
+  auto cv1 = eval_cv_R(conc, options) * options.Rd();
+  auto cvd = cv1.select(-1, 0)
+
+                 std::vector<int64_t>
+                     vec(yfrac.dim());
+  for (int i = 0; i < ndim - 1; ++i) vec[i] = i + 1;
+  vec[ndim - 1] = 0;
+  auto cvy =
+      (cv1.narrow(-1, 1, ny) * (1. + mu_ratio_m1) - 1.) * yfrac.permute(vec);
+
+  if (out.has_value()) {
+    out = cvd + cvy.sum(-1);
+    return out.value();
+  } else {
+    return cvd + cvy.sum(-1);
+  }
 }
 
 }  // namespace kintera

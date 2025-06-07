@@ -1,6 +1,7 @@
 // kintera
 #include <kintera/constants.h>
 
+#include "eval_uh.hpp"
 #include "thermo.hpp"
 
 namespace kintera {
@@ -105,15 +106,15 @@ torch::Tensor ThermoXImpl::compute(std::string ab,
                                    torch::optional<torch::Tensor> out) const {
   if (ab == "X->Y") {
     out = _xfrac_to_yfrac(*args.begin());
+  } else if (ab == "TC->H") {
+    out = _temp_to_enthalpy(*args.begin(), *(args.begin() + 1), out);
+  } else if (ab == "TC->cp") {
+    out = _cp_mean(*args.begin(), *(args.begin() + 1), out);
   } else if (ab == "TPX->C") {
     out = _xfrac_to_conc(*args.begin(), *(args.begin() + 1));
   } else if (ab == "TPX->D") {
     out =
         _temp_to_dens(*args.begin(), *(args.begin() + 1), *(args.begin() + 2));
-  } else if (ab == "TC->H") {
-    out = _temp_to_enthalpy(*args.begin(), *(args.begin() + 1), out);
-  } else if (ab == "TC->cp") {
-    out = _cp(*args.begin(), *(args.begin() + 1), out);
   } else {
     TORCH_CHECK(false, "Unknown abbreviation: ", ab);
   }
@@ -209,6 +210,36 @@ torch::Tensor ThermoXImpl::_xfrac_to_conc(torch::Tensor temp,
                                         conc.select(-1, 0).unsqueeze(-1);
 
   return conc;
+}
+
+torch::Tensor ThermoXImpl::_temp_to_enthalpy(
+    torch::Tensor temp, torch::Tensor conc,
+    torch::optional<torch::Tensor> out = torch::nullopt) const {
+  auto intEng = eval_intEng_R(temp, conc, options) * constants::Rgas;
+  auto zRT = eval_compress_z(temp, conc, options) * constants::Rgas *
+             temp.unsqueeze(-1);
+  int ngas = 1 + options.vapor_ids().size();
+
+  if (out.has_value()) {
+    out = (intEng * conc).sum(-1) + zRT * conc.narrow(-1, 0, ngas);
+    return out.value();
+  } else {
+    return (intEng * conc).sum(-1) + zRT * conc.narrow(-1, 0, ngas);
+  }
+}
+
+torch::Tensor ThermoXImpl::_cp_mean(
+    torch::Tensor temp, torch::Tensor conc,
+    torch::optional<torch::Tensor> out = torch::nullopt) const {
+  auto cp1 = eval_cp_R(temp, conc, options) * constants::Rgas;
+  auto ctotal = conc.sum(-1);
+
+  if (out.has_value()) {
+    out = (cp1 * conc).sum(-1) / ctotal;
+    return out.value();
+  } else {
+    return (cp1 * conc).sum(-1) / ctotal;
+  }
 }
 
 }  // namespace kintera

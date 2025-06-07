@@ -177,9 +177,10 @@ class ThermoYImpl : public torch::nn::Cloneable<ThermoYImpl> {
       torch::Tensor conc,
       torch::optional<torch::Tensor> out = torch::nullopt) const;
 
-  //! \brief calculate heat capacity
-  torch::Tensor _cv(torch::Tensor rho, torch::Tensor pres,
-                    torch::Tensor yfrac) const;
+  //! \brief calculate mean heat capacity
+  torch::Tensor _cv_mean(
+      torch::Tensor rho, torch::Tensor yfrac,
+      torch::optional<torch::Tensor> out = torch::nullopt) const;
 };
 TORCH_MODULE(ThermoY);
 
@@ -260,8 +261,9 @@ class ThermoXImpl : public torch::nn::Cloneable<ThermoXImpl> {
       torch::optional<torch::Tensor> out = torch::nullopt) const;
 
   //! \brief calculatec cp
-  torch::Tensor _cp(torch::Tensor temp, torch::Tensor conc,
-                    torch::optional<torch::Tensor> out = torch::nullopt) const;
+  torch::Tensor _cp_mean(
+      torch::Tensor temp, torch::Tensor conc,
+      torch::optional<torch::Tensor> out = torch::nullopt) const;
 };
 TORCH_MODULE(ThermoX);
 
