@@ -3,12 +3,9 @@
 
 #include "eval_uh.hpp"
 #include "thermo.hpp"
+#include "thermo_dispatch.hpp"
 
 namespace kintera {
-
-void call_equilibrate_tp_cpu(at::TensorIterator &iter, int ngas,
-                             user_func1 const *logsvp_func, double logsvp_eps,
-                             int max_iter);
 
 ThermoXImpl::ThermoXImpl(const ThermoOptions &options_) : options(options_) {
   int nvapor = options.vapor_ids().size();
@@ -111,7 +108,8 @@ torch::Tensor ThermoXImpl::compute(std::string ab,
   } else if (ab == "TC->cp") {
     out = _cp_mean(*args.begin(), *(args.begin() + 1), out);
   } else if (ab == "TPX->C") {
-    out = _xfrac_to_conc(*args.begin(), *(args.begin() + 1));
+    out =
+        _xfrac_to_conc(*args.begin(), *(args.begin() + 1), *(args.begin() + 2));
   } else if (ab == "TPX->D") {
     out =
         _temp_to_dens(*args.begin(), *(args.begin() + 1), *(args.begin() + 2));
@@ -145,14 +143,9 @@ torch::Tensor ThermoXImpl::forward(torch::Tensor temp, torch::Tensor pres,
   }
 
   // call the equilibrium solver
-  if (xfrac.is_cpu()) {
-    call_equilibrate_tp_cpu(iter, options.vapor_ids().size() + 1, logsvp_func,
-                            options.ftol(), options.max_iter());
-  } else if (xfrac.is_cuda()) {
-    TORCH_CHECK(false, "CUDA support not implemented yet");
-  } else {
-    TORCH_CHECK(false, "Unsupported tensor type");
-  }
+  at::native::call_equilibrate_tp(xfrac.device().type(), iter,
+                                  options.vapor_ids().size() + 1, logsvp_func,
+                                  options.ftol(), options.max_iter());
 
   delete[] logsvp_func;
 
@@ -214,7 +207,7 @@ torch::Tensor ThermoXImpl::_xfrac_to_conc(torch::Tensor temp,
 
 torch::Tensor ThermoXImpl::_temp_to_enthalpy(
     torch::Tensor temp, torch::Tensor conc,
-    torch::optional<torch::Tensor> out = torch::nullopt) const {
+    torch::optional<torch::Tensor> out) const {
   auto intEng = eval_intEng_R(temp, conc, options) * constants::Rgas;
   auto zRT = eval_compress_z(temp, conc, options) * constants::Rgas *
              temp.unsqueeze(-1);
@@ -228,9 +221,8 @@ torch::Tensor ThermoXImpl::_temp_to_enthalpy(
   }
 }
 
-torch::Tensor ThermoXImpl::_cp_mean(
-    torch::Tensor temp, torch::Tensor conc,
-    torch::optional<torch::Tensor> out = torch::nullopt) const {
+torch::Tensor ThermoXImpl::_cp_mean(torch::Tensor temp, torch::Tensor conc,
+                                    torch::optional<torch::Tensor> out) const {
   auto cp1 = eval_cp_R(temp, conc, options) * constants::Rgas;
   auto ctotal = conc.sum(-1);
 

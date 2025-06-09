@@ -1,9 +1,9 @@
 // kintera
 #include "eval_uh.hpp"
 
-namespace kintera {
+#include "thermo_dispatch.hpp"
 
-void call_func2_TC_cpu(at::TensorIterator& iter, user_func2 const* func);
+namespace kintera {
 
 torch::Tensor eval_cv_R(torch::Tensor temp, torch::Tensor conc,
                         ThermoOptions const& op) {
@@ -17,16 +17,13 @@ torch::Tensor eval_cv_R(torch::Tensor temp, torch::Tensor conc,
                   .build();
 
   // call the evaluation function
-  if (temp.is_cpu()) {
-    call_func2_TC_cpu(iter, op.cv_R_extra().data());
-  } else if (temp.is_cuda()) {
-    // call_func2_TC_cuda();
-    TORCH_CHECK(false, "CUDA support not implemented yet.");
-  } else {
-    TORCH_CHECK(false, "Unsupported device type for thermo evaluation.");
-  }
+  at::native::call_with_TC(cv_R.device().type(), iter, op.cv_R_extra().data());
 
-  return cv + op.cref_R();
+  auto vec = temp.sizes().vec();
+  vec.push_back(op.cref_R().size());
+  auto cref_R = torch::tensor(op.cref_R(), temp.options()).view(vec);
+
+  return cv_R + cref_R.unsqueeze(-1) + 1;
 }
 
 torch::Tensor eval_cp_R(torch::Tensor temp, torch::Tensor conc,
@@ -41,17 +38,14 @@ torch::Tensor eval_cp_R(torch::Tensor temp, torch::Tensor conc,
                   .build();
 
   // call the evaluation function
-  if (temp.is_cpu()) {
-    call_func2_TC_cpu(iter, op.cp_R_extra().data());
-  } else if (temp.is_cuda()) {
-    // call_func2_TC_cuda();
-    TORCH_CHECK(false, "CUDA support not implemented yet.");
-  } else {
-    TORCH_CHECK(false, "Unsupported device type for thermo evaluation.");
-  }
+  at::native::call_with_TC(cp_R.device().type(), iter, op.cp_R_extra().data());
+
+  auto vec = temp.sizes().vec();
+  vec.push_back(op.cref_R().size());
+  auto cref_R = torch::tensor(op.cref_R(), temp.options()).view(vec);
 
   cp_R.narrow(-1, 0, 1 + op.vapor_ids().size()) += 1;
-  return cp_R + op.cref_R()
+  return cp_R + cref_R;
 }
 
 torch::Tensor eval_compress_z(torch::Tensor temp, torch::Tensor conc,
@@ -66,14 +60,7 @@ torch::Tensor eval_compress_z(torch::Tensor temp, torch::Tensor conc,
                   .build();
 
   // call the evaluation function
-  if (temp.is_cpu()) {
-    call_func2_TC_cpu(iter, op.compress_z().data());
-  } else if (temp.is_cuda()) {
-    // call_func2_TC_cuda();
-    TORCH_CHECK(false, "CUDA support not implemented yet.");
-  } else {
-    TORCH_CHECK(false, "Unsupported device type for thermo evaluation.");
-  }
+  at::native::call_with_TC(cz.device().type(), iter, op.compress_z().data());
 
   return cz;
 }
@@ -90,17 +77,14 @@ torch::Tensor eval_intEng_R(torch::Tensor temp, torch::Tensor conc,
                   .build();
 
   // call the evaluation function
-  if (temp.is_cpu()) {
-    call_func2_TC_cpu(iter, op.intEng_R_extra().data());
-  } else if (temp.is_cuda()) {
-    // call_func2_TC_cuda(iter, op.intEng_R_extra().data());
-    TORCH_CHECK(false, "CUDA support not implemented yet.");
-  } else {
-    TORCH_CHECK(false, "Unsupported device type for thermo evaluation.");
-  }
+  at::native::call_with_TC(intEng_R.device().type(), iter,
+                           op.intEng_R_extra().data());
 
-  auto cref_R = torch::tensor(op.cref_R(), temp.options());
-  for (int n = 0; n < temp.dims(); ++n) cref_R.unsqueeze(0);
+  auto vec = temp.sizes().vec();
+  vec.push_back(op.cref_R().size());
+
+  auto cref_R = torch::tensor(op.cref_R(), temp.options()).view(vec);
+  auto uref_R = torch::tensor(op.uref_R(), temp.options()).view(vec);
 
   return uref_R + temp.unsqueeze(-1) * cref_R + intEng_R;
 }

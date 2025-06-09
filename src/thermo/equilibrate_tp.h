@@ -1,3 +1,5 @@
+#pragma once
+
 // C/C++
 #include <cmath>
 #include <cstdio>

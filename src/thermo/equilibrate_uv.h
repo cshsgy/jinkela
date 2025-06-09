@@ -1,3 +1,5 @@
+#pragma once
+
 // C/C++
 #include <cmath>
 #include <cstdio>
@@ -157,7 +159,7 @@ int equilibrate_uv(T *temp, T *conc, T h0, T const *stoich, int nspecies,
           (log_conc_sum > (logsvp[j] + logsvp_eps))) {
         for (int i = 0; i < nspecies; i++) {
           weight[first * nspecies + i] =
-              logsvp_ddT[j] * enthalpy[i] / heat_capacity;
+              logsvp_ddT[j] * intEng[i] / heat_capacity;
           if (stoich[i * nreaction + j] < 0) {
             weight[first * nspecies + i] +=
                 (-stoich[i * nreaction + j]) / conc[i];
@@ -214,13 +216,13 @@ int equilibrate_uv(T *temp, T *conc, T h0, T const *stoich, int nspecies,
 
       // re-evaluate internal energy and its derivative
       for (int i = 0; i < nspecies; i++) {
-        intEng[i] = intEng_offset[i] + cp_const[i] * (*temp);
+        intEng[i] = intEng_offset[i] + cv_const[i] * (*temp);
         if (intEng_R_extra[i]) {
           intEng[i] += intEng_R_extra[i](*temp, conc[i]) * constants::Rgas;
         }
-        intEng_ddT[i] = cp_const[i];
+        intEng_ddT[i] = cv_const[i];
         if (cv_R_extra[i]) {
-          intEng_ddT[i] += cv_R_extra[i](*temp, conc[i]) * constant::Rgas;
+          intEng_ddT[i] += cv_R_extra[i](*temp, conc[i]) * constants::Rgas;
         }
         zh += intEng[i] * conc[i];
         zc += intEng_ddT[i] * conc[i];

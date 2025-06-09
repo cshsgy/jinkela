@@ -179,7 +179,7 @@ class ThermoYImpl : public torch::nn::Cloneable<ThermoYImpl> {
 
   //! \brief calculate mean heat capacity
   torch::Tensor _cv_mean(
-      torch::Tensor rho, torch::Tensor yfrac,
+      torch::Tensor rho, torch::Tensor pres, torch::Tensor yfrac,
       torch::optional<torch::Tensor> out = torch::nullopt) const;
 };
 TORCH_MODULE(ThermoY);

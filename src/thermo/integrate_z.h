@@ -1,3 +1,5 @@
+#pragma once
+
 // C/C++
 #include <cmath>
 #include <string>
@@ -5,8 +7,10 @@
 // kintera
 #include <kintera/constants.h>
 
-#include "cal_dlnT_dlnP_impl.h"
-#include "thermo.hpp"
+#include <kintera/utils/func1.hpp>
+
+#include "cal_dlnT_dlnP.h"
+#include "equilibrate_tp.h"
 
 namespace kintera {
 
@@ -50,11 +54,11 @@ void integrate_z(T* xfrac, T* temp, T* pres, T* mu, T dz, char const* method,
   T chi = 0.;
 
   if (strcmp(method, "reversible") == 0 || strcmp(method, "pseudo") == 0) {
-    chi = cal_dlnT_dlnP(xfrac, gammad, cp_ratio, latent, ngas - 1,
+    chi = cal_dlnT_dlnP(xfrac, &gammad, cp_ratio, latent, ngas - 1,
                         nspecies - ngas);
   } else if (strcmp(method, "dry") == 0) {
     for (int i = 1; i < ngas; ++i) latent[i] = 0;
-    chi = cal_dlnT_dlnP(xfrac, gammad, cp_ratio, latent, ngas - 1,
+    chi = cal_dlnT_dlnP(xfrac, &gammad, cp_ratio, latent, ngas - 1,
                         nspecies - ngas);
   } else {  // isothermal
     chi = 0.;
@@ -67,16 +71,16 @@ void integrate_z(T* xfrac, T* temp, T* pres, T* mu, T dz, char const* method,
   T temp0 = *temp;
   (*temp) += dTdz * dz;
 
-  if (!(temp > 0.)) (*temp) = temp0;
+  if ((*temp) <= 0.) (*temp) = temp0;
 
   if (fabs((*temp) - temp0) > 0.01) {
-    (*pres) *= pow(temp / temp0, 1. / chi);
+    (*pres) *= pow(*temp / temp0, 1. / chi);
   } else {  // isothermal limit
-    (*pres) *= exp(-2. * g_ov_Rd * dz / (R_ov_Rd * (temp + temp0)));
+    (*pres) *= exp(-2. * g_ov_Rd * dz / (R_ov_Rd * (*temp + temp0)));
   }
 
   equilibrate_tp(xfrac, *temp, *pres, stoich, nspecies, ngas - 1, ngas,
-                 user_func1 logsvp_func, logsvp_eps, max_iter);
+                 logsvp_func, logsvp_eps, max_iter);
 
   free(latent);
   free(cp_ratio);

@@ -1,16 +1,11 @@
 // kintera
 #include <kintera/constants.h>
 
+#include "eval_uh.hpp"
 #include "thermo.hpp"
+#include "thermo_dispatch.hpp"
 
 namespace kintera {
-
-void call_equilibrate_uv_cpu(at::TensorIterator &iter,
-                             user_func1 const *logsvp_func,
-                             user_func1 const *logsvp_func_ddT,
-                             user_func2 const *intEng_R_extra,
-                             user_func2 const *cv_R_extra, float logsvp_eps,
-                             int max_iter);
 
 ThermoYImpl::ThermoYImpl(const ThermoOptions &options_) : options(options_) {
   int nvapor = options.vapor_ids().size();
@@ -121,7 +116,8 @@ torch::Tensor ThermoYImpl::compute(std::string ab,
   } else if (ab == "DY->C") {
     out = _yfrac_to_conc(*args.begin(), *(args.begin() + 1));
   } else if (ab == "DY->cv") {
-    out = _cv_mean(*args.begin(), *(args.begin() + 1), out);
+    out =
+        _cv_mean(*args.begin(), *(args.begin() + 1), *(args.begin() + 2), out);
   } else if (ab == "DPY->U") {
     out = _pres_to_intEng(*args.begin(), *(args.begin() + 1),
                           *(args.begin() + 2));
@@ -186,15 +182,10 @@ torch::Tensor ThermoYImpl::forward(torch::Tensor rho, torch::Tensor intEng,
   }
 
   // call the equilibrium solver
-  if (conc.is_cpu()) {
-    call_equilibrate_uv_cpu(
-        iter, logsvp_func, logsvp_func_ddT, options.intEng_R_extra().data(),
-        options.cv_R_extra().data(), options.ftol(), options.max_iter());
-  } else if (conc.is_cuda()) {
-    TORCH_CHECK(false, "CUDA support not implemented yet");
-  } else {
-    TORCH_CHECK(false, "Unsupported tensor type");
-  }
+  at::native::call_equilibrate_uv(
+      conc.device().type(), iter, logsvp_func, logsvp_func_ddT,
+      options.intEng_R_extra().data(), options.cv_R_extra().data(),
+      options.ftol(), options.max_iter());
 
   delete[] logsvp_func;
   delete[] logsvp_func_ddT;
@@ -308,16 +299,17 @@ torch::Tensor ThermoYImpl::_conc_to_yfrac(
   return yfrac;
 }
 
-torch::Tensor ThermoYImpl::_cv_mean(
-    torch::Tensor rho, torch::Tensor yfrac,
-    torch::optional<torch::Tensor> out = torch::nullopt) const {
+torch::Tensor ThermoYImpl::_cv_mean(torch::Tensor rho, torch::Tensor pres,
+                                    torch::Tensor yfrac,
+                                    torch::optional<torch::Tensor> out) const {
   int ny = yfrac.size(-1);
+  auto temp = compute("DPY->T", {rho, pres, yfrac});
   auto conc = _yfrac_to_conc(rho, yfrac);
-  auto cv1 = eval_cv_R(conc, options) * options.Rd();
-  auto cvd = cv1.select(-1, 0)
+  auto cv1 = eval_cv_R(temp, conc, options) * options.Rd();
+  auto cvd = cv1.select(-1, 0);
 
-                 std::vector<int64_t>
-                     vec(yfrac.dim());
+  int ndim = yfrac.dim();
+  std::vector<int64_t> vec(ndim);
   for (int i = 0; i < ndim - 1; ++i) vec[i] = i + 1;
   vec[ndim - 1] = 0;
   auto cvy =
