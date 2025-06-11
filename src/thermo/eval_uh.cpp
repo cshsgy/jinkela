@@ -14,6 +14,8 @@ torch::Tensor eval_cv_R(torch::Tensor temp, torch::Tensor conc,
 
   // bundle iterator
   auto iter = at::TensorIteratorConfig()
+                  .resize_outputs(false)
+                  .check_all_same_dtype(true)
                   .declare_static_shape(cv_R_extra.sizes(),
                                         /*squash_dim=*/{conc.dim() - 1})
                   .add_output(cv_R_extra)
@@ -36,6 +38,8 @@ torch::Tensor eval_cp_R(torch::Tensor temp, torch::Tensor conc,
 
   // bundle iterator
   auto iter = at::TensorIteratorConfig()
+                  .resize_outputs(false)
+                  .check_all_same_dtype(true)
                   .declare_static_shape(cp_R_extra.sizes(),
                                         /*squash_dim=*/{conc.dim() - 1})
                   .add_output(cp_R_extra)
@@ -60,6 +64,8 @@ torch::Tensor eval_czh(torch::Tensor temp, torch::Tensor conc,
 
   // bundle iterator
   auto iter = at::TensorIteratorConfig()
+                  .resize_outputs(false)
+                  .check_all_same_dtype(true)
                   .declare_static_shape(cz.sizes(),
                                         /*squash_dim=*/{conc.dim() - 1})
                   .add_output(cz)
@@ -79,6 +85,8 @@ torch::Tensor eval_czh_ddC(torch::Tensor temp, torch::Tensor conc,
 
   // bundle iterator
   auto iter = at::TensorIteratorConfig()
+                  .resize_outputs(false)
+                  .check_all_same_dtype(true)
                   .declare_static_shape(cz_ddC.sizes(),
                                         /*squash_dim=*/{conc.dim() - 1})
                   .add_output(cz_ddC)
@@ -98,6 +106,8 @@ torch::Tensor eval_intEng_R(torch::Tensor temp, torch::Tensor conc,
 
   // bundle iterator
   auto iter = at::TensorIteratorConfig()
+                  .resize_outputs(false)
+                  .check_all_same_dtype(true)
                   .declare_static_shape(intEng_R_extra.sizes(),
                                         /*squash_dim=*/{conc.dim() - 1})
                   .add_output(intEng_R_extra)

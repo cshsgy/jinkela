@@ -30,20 +30,33 @@ TEST_P(DeviceTest, thermo_y) {
 
   for (int i = 0; i < ny; ++i) yfrac[i] = 0.01 * (i + 1);
 
+  ////////// Testing Y->X conversion //////////
   auto xfrac = thermo->compute("Y->X", {yfrac});
-
   EXPECT_EQ(torch::allclose(
                 xfrac.sum(-1),
                 torch::ones({1, 2, 3}, torch::device(device).dtype(dtype)),
                 /*rtol=*/1e-4, /*atol=*/1e-4),
             true);
 
+  ////////// Testing DY->V conversion //////////
   auto rho = torch::ones({1, 2, 3}, torch::device(device).dtype(dtype));
   auto dens = thermo->compute("DY->V", {rho, yfrac});
-
   EXPECT_EQ(torch::allclose(rho, dens.sum(-1),
                             /*rtol=*/1e-4, /*atol=*/1e-4),
             true);
+
+  ////////// Testing V->Y conversion //////////
+  auto yfrac2 = thermo->compute("V->Y", {dens});
+  EXPECT_EQ(torch::allclose(yfrac, yfrac2, /*rtol=*/1e-4, /*atol=*/1e-4), true);
+
+  ////////// Testing VT->P conversion //////////
+  auto temp = 300. * torch::ones({1, 2, 3}, torch::device(device).dtype(dtype));
+  auto pres = thermo->compute("VT->P", {dens, temp});
+  std::cout << "pres = " << pres << std::endl;
+
+  ////////// Testing PV->T conversion //////////
+  auto temp2 = thermo->compute("PV->T", {pres, dens});
+  EXPECT_EQ(torch::allclose(temp, temp2, /*rtol=*/1e-4, /*atol=*/1e-4), true);
 }
 
 TEST_P(DeviceTest, thermo_x) {

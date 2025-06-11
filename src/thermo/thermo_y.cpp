@@ -385,9 +385,9 @@ void ThermoYImpl::_temp_to_pres(torch::Tensor ivol, torch::Tensor temp,
   int ngas = 1 + options.vapor_ids().size();
 
   // kg/m^3 -> mol/m^3
-  auto conc = ivol * inv_mu;
-  auto cz = eval_czh(temp, conc, options).narrow(-1, 0, ngas);
-  out = constants::Rgas * temp * (cz * conc.narrow(-1, 0, ngas)).sum(-1);
+  auto conc_gas = (ivol * inv_mu).narrow(-1, 0, ngas);
+  auto cz = eval_czh(temp, conc_gas, options);
+  out = constants::Rgas * temp * (cz * conc_gas).sum(-1);
 }
 
 }  // namespace kintera
