@@ -40,23 +40,34 @@ TEST_P(DeviceTest, thermo_y) {
 
   ////////// Testing DY->V conversion //////////
   auto rho = torch::ones({1, 2, 3}, torch::device(device).dtype(dtype));
-  auto dens = thermo->compute("DY->V", {rho, yfrac});
-  EXPECT_EQ(torch::allclose(rho, dens.sum(-1),
+  auto ivol = thermo->compute("DY->V", {rho, yfrac});
+  EXPECT_EQ(torch::allclose(rho, ivol.sum(-1),
                             /*rtol=*/1e-4, /*atol=*/1e-4),
             true);
 
   ////////// Testing V->Y conversion //////////
-  auto yfrac2 = thermo->compute("V->Y", {dens});
+  auto yfrac2 = thermo->compute("V->Y", {ivol});
   EXPECT_EQ(torch::allclose(yfrac, yfrac2, /*rtol=*/1e-4, /*atol=*/1e-4), true);
 
   ////////// Testing VT->P conversion //////////
   auto temp = 300. * torch::ones({1, 2, 3}, torch::device(device).dtype(dtype));
-  auto pres = thermo->compute("VT->P", {dens, temp});
-  std::cout << "pres = " << pres << std::endl;
+  auto pres = thermo->compute("VT->P", {ivol, temp});
 
   ////////// Testing PV->T conversion //////////
-  auto temp2 = thermo->compute("PV->T", {pres, dens});
+  auto temp2 = thermo->compute("PV->T", {pres, ivol});
   EXPECT_EQ(torch::allclose(temp, temp2, /*rtol=*/1e-4, /*atol=*/1e-4), true);
+
+  ////////// Testing VT->cv conversion //////////
+  auto cv = thermo->compute("VT->cv", {ivol, temp});
+  std::cout << "cv = " << cv << std::endl;
+
+  ////////// Testing VT->U conversion //////////
+  auto intEng = thermo->compute("VT->U", {ivol, temp});
+  std::cout << "intEng = " << intEng << std::endl;
+
+  ////////// Testing VU->T conversion //////////
+  auto temp3 = thermo->compute("VU->T", {ivol, intEng});
+  EXPECT_EQ(torch::allclose(temp, temp3, /*rtol=*/1e-4, /*atol=*/1e-4), true);
 }
 
 TEST_P(DeviceTest, thermo_x) {

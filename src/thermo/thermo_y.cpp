@@ -148,11 +148,11 @@ torch::Tensor const &ThermoYImpl::compute(
     _cv_vol(_V, _T, _cv);
     return _cv;
   } else if (ab == "VT->U") {
-    _T.resize_as_(*args.begin());
-    _T.copy_(*args.begin());
-    _V.resize_as_(*(args.begin() + 1));
-    _V.copy_(*(args.begin() + 1));
-    _temp_to_intEng(_T, _V, _U);
+    _V.resize_as_(*args.begin());
+    _V.copy_(*args.begin());
+    _T.resize_as_(*(args.begin() + 1));
+    _T.copy_(*(args.begin() + 1));
+    _temp_to_intEng(_V, _T, _U);
     return _U;
   } else if (ab == "VU->T") {
     _V.resize_as_(*args.begin());
@@ -328,9 +328,9 @@ void ThermoYImpl::_pres_to_temp(torch::Tensor pres, torch::Tensor ivol,
     auto func = out * (cz * conc_gas).sum(-1) - pres / constants::Rgas;
     auto cv_R = eval_cv_R(out, conc_gas, options);
     auto cp_R = eval_cp_R(out, conc_gas, options);
-    auto temp_pres = out.clone();
+    auto temp_pre = out.clone();
     out += func / ((cp_R - cv_R) * conc_gas).sum(-1);
-    if ((1. - temp_pres / out).abs().max().item<double>() < options.ftol()) {
+    if ((1. - temp_pre / out).abs().max().item<double>() < options.ftol()) {
       break;
     }
   }

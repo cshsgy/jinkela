@@ -27,9 +27,9 @@ torch::Tensor eval_cv_R(torch::Tensor temp, torch::Tensor conc,
   at::native::call_with_TC(cv_R_extra.device().type(), iter,
                            op.cv_R_extra().data());
 
-  auto cref_R = torch::tensor(op.cref_R(), temp.options());
-
-  return cref_R + cv_R_extra;
+  auto cref_R =
+      torch::tensor(op.cref_R(), temp.options()).narrow(0, 0, conc.size(-1));
+  return cv_R_extra + cref_R;
 }
 
 torch::Tensor eval_cp_R(torch::Tensor temp, torch::Tensor conc,
@@ -51,10 +51,10 @@ torch::Tensor eval_cp_R(torch::Tensor temp, torch::Tensor conc,
   at::native::call_with_TC(cp_R_extra.device().type(), iter,
                            op.cp_R_extra().data());
 
-  auto cref_R = torch::tensor(op.cref_R(), temp.options());
+  auto cref_R =
+      torch::tensor(op.cref_R(), temp.options()).narrow(0, 0, conc.size(-1));
   cref_R.narrow(-1, 0, 1 + op.vapor_ids().size()) += 1;
-
-  return cref_R + cp_R_extra;
+  return cp_R_extra + cref_R;
 }
 
 torch::Tensor eval_czh(torch::Tensor temp, torch::Tensor conc,
