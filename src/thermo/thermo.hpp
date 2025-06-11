@@ -47,7 +47,6 @@ struct ThermoOptions {
 
   ThermoOptions() = default;
 
-  ADD_ARG(double, gammad) = 1.4;
   ADD_ARG(double, Rd) = 287.0;
   ADD_ARG(double, Tref) = 300.0;
   ADD_ARG(double, Pref) = 1.e5;
@@ -74,14 +73,14 @@ struct ThermoOptions {
 //! Mass Thermodynamics
 class ThermoYImpl : public torch::nn::Cloneable<ThermoYImpl> {
  public:
-  //! mud / mu - 1.
-  torch::Tensor mu_ratio_m1;
+  //! 1. / mu. [mol/kg]
+  torch::Tensor inv_mu;
 
-  //! cv/cvd - 1.
-  torch::Tensor cv_ratio_m1;
+  //! constant part of heat capacity at constant volume [J/(kg K)]
+  torch::Tensor cv0;
 
-  //! dimensionless internal energy offset at T = 0
-  torch::Tensor u0_R;
+  //! internal energy offset at T = 0 [J/kg]
+  torch::Tensor u0;
 
   //! stoichiometry matrix
   torch::Tensor stoich;
@@ -93,57 +92,30 @@ class ThermoYImpl : public torch::nn::Cloneable<ThermoYImpl> {
   explicit ThermoYImpl(const ThermoOptions& options_);
   void reset() override;
 
-  //! \brief multi-component density correction
-  /*!
-   * Eq.16 in Li2019
-   * $ f_{\epsilon} = 1 + \sum_{i \in V \cup C} y_i(1./\epsilon_{i} - 1) $
-   *
-   * \param yfrac mass fraction
-   * \param n starting index
-   */
-  torch::Tensor f_eps(torch::Tensor yfrac, int n = 0) const;
-
-  //! \brief multi-component cv correction
-  /*!
-   * Eq.62 in Li2019
-   * $ f_{\sigma} = 1 + \sum_{i \in V \cup C} y_i(\sigma_{v,i} - 1) $
-   *
-   * \param yfrac mass fraction
-   * \param n starting index
-   */
-  torch::Tensor f_sig(torch::Tensor yfrac, int n = 0) const;
-
   //! \brief perform conversions
-  torch::Tensor compute(
-      std::string ab, std::initializer_list<torch::Tensor> args,
-      torch::optional<torch::Tensor> out = torch::nullopt) const;
+  torch::Tensor const& compute(std::string ab,
+                               std::initializer_list<torch::Tensor> args) const;
 
   //! \brief Perform saturation adjustment
   /*!
    * \param rho density
-   *
    * \param yfrac mass fraction
-   *
    * \param intEng zero-offset total internal energy [J/m^3]
-   * $ U = \rho U_0 f_{sigma} $
-   *
-   * \return adjusted density
+   * \return adjusted mass fraction
    */
   torch::Tensor forward(torch::Tensor rho, torch::Tensor intEng,
                         torch::Tensor yfrac);
 
  private:
-  //! \brief pressure (pa) -> temperature (K)
-  torch::Tensor _pres_to_temp(torch::Tensor rho, torch::Tensor pres,
-                              torch::Tensor yfrac) const {
-    return pres / (rho * options.Rd() * f_eps(yfrac));
-  }
+  //! cache
+  torch::Tensor _P, _Y, _X, _V, _T, _cv, _U, _S, _F;
 
-  //! \brief temperature (K) -> pressure (pa)
-  torch::Tensor _temp_to_pres(torch::Tensor rho, torch::Tensor temp,
-                              torch::Tensor yfrac) const {
-    return rho * temp * options.Rd() * f_eps(yfrac);
-  }
+  //! \brief specific volume (m^3/kg) to mass fraction
+  /*
+   * \param[in] ivol inverse specific volume, kg/m^3, (..., 1 + ny)
+   * \param[out] out mass fraction, (ny, ...)
+   */
+  void _ivol_to_yfrac(torch::Tensor ivol, torch::Tensor& out) const;
 
   //! \brief Calculate mole fraction from mass fraction
   /*!
@@ -151,50 +123,78 @@ class ThermoYImpl : public torch::nn::Cloneable<ThermoYImpl> {
    * $ x_i = \frac{y_i/\epsilon_i}{1. + \sum_{i \in V \cup C} y_i(1./\epsilon_i
    * - 1.)} $
    *
-   * \param yfrac mass fraction, (ny, ...)
-   * \return mole fraction, (..., 1 + ny)
+   * \param[in] yfrac mass fraction, (ny, ...)
+   * \param[out] out mole fraction, (..., 1 + ny)
    */
-  torch::Tensor _yfrac_to_xfrac(torch::Tensor yfrac) const;
+  void _yfrac_to_xfrac(torch::Tensor yfrac, torch::Tensor& out) const;
 
-  //! \brief pressure (pa) -> internal energy (J/m^3)
-  torch::Tensor _pres_to_intEng(torch::Tensor rho, torch::Tensor pres,
-                                torch::Tensor yfrac) const;
-
-  //! \brief internal energy (J/m^3) -> pressure (pa)
-  torch::Tensor _intEng_to_pres(torch::Tensor rho, torch::Tensor intEng,
-                                torch::Tensor yfrac) const;
-
-  //! \brief mass fraction to mole concentration (mol/m^3)
+  //! \brief mass fraction to specific volume (m^3/kg)
   /*!
-   * \param rho total density, kg/m^3
-   * \param yfrac mass fraction, (ny, ...)
-   * \return mole concentration, mol/m^3, (..., 1 + ny)
+   * \param[in] rho total density, kg/m^3
+   * \param[in] yfrac mass fraction, (ny, ...)
+   * \param[out] out inverse specific volume, kg/m^3/, (..., 1 + ny)
    */
-  torch::Tensor _yfrac_to_conc(torch::Tensor rho, torch::Tensor yfrac) const;
+  void _yfrac_to_ivol(torch::Tensor rho, torch::Tensor yfrac,
+                      torch::Tensor& out) const;
 
-  //! \brief mole concentration (mol/m^3) to mass fraction
-  torch::Tensor _conc_to_yfrac(
-      torch::Tensor conc,
-      torch::optional<torch::Tensor> out = torch::nullopt) const;
+  //! \brief Calculate temperature (K)
+  /*`
+   * \param[in] pres pressure, pa
+   * \param[in] ivol inverse of specific volume, kg/m^3, (..., 1 + ny)
+   * \param[out] temperature, K, (...)
+   */
+  void _pres_to_temp(torch::Tensor pres, torch::Tensor ivol,
+                     torch::Tensor& out) const;
 
-  //! \brief calculate mean heat capacity
-  torch::Tensor _cv_mean(
-      torch::Tensor rho, torch::Tensor pres, torch::Tensor yfrac,
-      torch::optional<torch::Tensor> out = torch::nullopt) const;
+  //! \brief calculate volumetric heat capacity (J/(m^3 K))
+  /*!
+   * \param[in] ivol inverse of specific volume, kg/m^3, (..., 1 + ny)
+   * \param[in] temp temperature, K
+   * \param[out] out volumetric heat capacity, J/(m^3 K), (...)
+   */
+  void _cv_vol(torch::Tensor ivol, torch::Tensor temp,
+               torch::Tensor& out) const;
+
+  //! \brief calculate volumetric internal energy (J/m^3)
+  /*!
+   * \param[in] ivol inverse of specific volume, kg/m^3, (..., 1 + ny)
+   * \param[in] temp temperature, K
+   * \param[out] out volumetric internal energy, J/m^3, (...)
+   */
+  void _temp_to_intEng(torch::Tensor ivol, torch::Tensor temp,
+                       torch::Tensor& out) const;
+
+  //! \brief calculate temperature (K) from internal energy
+  /*!
+   * \param[in] ivol inverse of specific volume, kg/m^3, (..., 1 + ny)
+   * \param[in] intEng volumetric internal energy, J/m^3, (...)
+   * \param[out] out temperature, K, (...)
+   */
+  void _intEng_to_temp(torch::Tensor ivol, torch::Tensor intEng,
+                       torch::Tensor& out) const;
+
+  //! \brief calculate pressure (Pa)
+  /*!
+   * \param[in] ivol inverse of specific volume, kg/m^3, (..., 1 + ny)
+   * \param[in] temp temperature, K
+   * \param[out] out pressure, Pa, (...)
+   */
+  void _temp_to_pres(torch::Tensor ivol, torch::Tensor temp,
+                     torch::Tensor& out) const;
 };
 TORCH_MODULE(ThermoY);
 
 //! Molar thermodynamics
 class ThermoXImpl : public torch::nn::Cloneable<ThermoXImpl> {
  public:
-  //! mu / mud - 1.
-  torch::Tensor mu_ratio_m1;
+  //! mu.
+  torch::Tensor mu;
 
-  //! cp/cpd - 1.
-  torch::Tensor cp_ratio_m1;
+  //! const part of heat capacity at constant pressure
+  torch::Tensor cp0;
 
-  //! dimensionless enthalpy offset at T = 0
-  torch::Tensor h0_R;
+  //! enthalpy offset at T = 0
+  torch::Tensor h0;
 
   //! stoichiometry matrix
   torch::Tensor stoich;
@@ -216,15 +216,17 @@ class ThermoXImpl : public torch::nn::Cloneable<ThermoXImpl> {
   torch::Tensor f_psi(torch::Tensor xfrac) const;
 
   //! \brief perform conversions
-  torch::Tensor compute(
-      std::string ab, std::initializer_list<torch::Tensor> args,
-      torch::optional<torch::Tensor> out = torch::nullopt) const;
+  torch::Tensor const& compute(std::string ab,
+                               std::initializer_list<torch::Tensor> args) const;
 
   //! \brief Calculate the equilibrium state given temperature and pressure
   torch::Tensor forward(torch::Tensor temp, torch::Tensor pres,
                         torch::Tensor xfrac);
 
  private:
+  //! cache
+  torch::Tensor _T, _P, _X, _D, _Y, _V, _H, _S, _F, _G, _cp;
+
   //! \brief Calculate mass fraction from mole fraction
   /*!
    * Eq.76 in Li2019

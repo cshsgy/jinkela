@@ -95,10 +95,8 @@ void call_with_TC_cpu(at::TensorIterator &iter, user_func2 const *func) {
         auto temp = reinterpret_cast<scalar_t *>(data[1] + i * strides[1]);
         auto conc = reinterpret_cast<scalar_t *>(data[2] + i * strides[2]);
         for (int j = 0; j < nspecies; ++j) {
-          if (func[j] == nullptr) {
-            out[j] = 0;
-          } else {
-            out[j] = func[j](*temp, conc[j]);
+          if (func[j] != nullptr) {
+            out[j] += func[j](*temp, conc[j]);
           }
         }
       }

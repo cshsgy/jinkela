@@ -33,8 +33,6 @@ ThermoOptions ThermoOptions::from_yaml(std::string const& filename) {
       thermo.Pref(config["reference-state"]["Pref"].as<double>());
   }
 
-  std::vector<double> cref_R, uref_R;
-
   for (const auto& sp : config["species"]) {
     species_names.push_back(sp["name"].as<std::string>());
     std::map<std::string, double> comp;
@@ -47,19 +45,18 @@ ThermoOptions ThermoOptions::from_yaml(std::string const& filename) {
     species_weights.push_back(harp::get_compound_weight(comp));
 
     if (sp["cv_R"]) {
-      cref_R.push_back(sp["cv_R"].as<double>());
+      thermo.cref_R().push_back(sp["cv_R"].as<double>());
     } else {
-      cref_R.push_back(5. / 2.);
+      thermo.cref_R().push_back(5. / 2.);
     }
 
     if (sp["u0_R"]) {
-      uref_R.push_back(sp["u0_R"].as<double>());
+      thermo.uref_R().push_back(sp["u0_R"].as<double>());
     } else {
-      uref_R.push_back(0.);
+      thermo.uref_R().push_back(0.);
     }
   }
 
-  thermo.gammad((cref_R[0] + 1.) / cref_R[0]);
   thermo.Rd(constants::Rgas / species_weights[0]);
 
   thermo.mu_ratio().clear();
@@ -84,8 +81,6 @@ ThermoOptions ThermoOptions::from_yaml(std::string const& filename) {
   for (int i = 0; i < thermo.vapor_ids().size(); ++i) {
     auto id = thermo.vapor_ids()[i];
     thermo.mu_ratio().push_back(species_weights[id] / species_weights[0]);
-    thermo.cref_R().push_back(cref_R[id]);
-    thermo.uref_R().push_back(uref_R[id]);
   }
 
   // register clouds
@@ -103,8 +98,6 @@ ThermoOptions ThermoOptions::from_yaml(std::string const& filename) {
   for (int i = 0; i < thermo.cloud_ids().size(); ++i) {
     auto id = thermo.cloud_ids()[i];
     thermo.mu_ratio().push_back(species_weights[id] / species_weights[0]);
-    thermo.cref_R().push_back(cref_R[id]);
-    thermo.uref_R().push_back(uref_R[id]);
   }
 
   // register reactions
