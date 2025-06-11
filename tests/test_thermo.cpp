@@ -59,11 +59,9 @@ TEST_P(DeviceTest, thermo_y) {
 
   ////////// Testing VT->cv conversion //////////
   auto cv = thermo->compute("VT->cv", {ivol, temp});
-  std::cout << "cv = " << cv << std::endl;
 
   ////////// Testing VT->U conversion //////////
   auto intEng = thermo->compute("VT->U", {ivol, temp});
-  std::cout << "intEng = " << intEng << std::endl;
 
   ////////// Testing VU->T conversion //////////
   auto temp3 = thermo->compute("VU->T", {ivol, intEng});
