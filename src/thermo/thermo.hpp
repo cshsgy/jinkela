@@ -109,13 +109,13 @@ class ThermoYImpl : public torch::nn::Cloneable<ThermoYImpl> {
 
   //! \brief Perform saturation adjustment
   /*!
-   * \param rho density
-   * \param yfrac mass fraction
-   * \param intEng zero-offset total internal energy [J/m^3]
-   * \return adjusted mass fraction
+   * \param[in] rho density
+   * \param[in] intEng total internal energy [J/m^3]
+   * \param[in,out] yfrac mass fraction, (ny, ...)
+   * \return difference between the output and input mass fraction
    */
   torch::Tensor forward(torch::Tensor rho, torch::Tensor intEng,
-                        torch::Tensor yfrac);
+                        torch::Tensor& yfrac);
 
  private:
   //! cache
@@ -197,12 +197,6 @@ class ThermoXImpl : public torch::nn::Cloneable<ThermoXImpl> {
   //! mu.
   torch::Tensor mu;
 
-  //! const part of heat capacity at constant pressure
-  torch::Tensor cp0;
-
-  //! enthalpy offset at T = 0
-  torch::Tensor h0;
-
   //! stoichiometry matrix
   torch::Tensor stoich;
 
@@ -214,12 +208,23 @@ class ThermoXImpl : public torch::nn::Cloneable<ThermoXImpl> {
   void reset() override;
 
   //! \brief perform conversions
+  /*!
+   * \param ab name of the conversion to perform
+   * \param args arguments to the conversion function
+   * \return result of the conversion
+   */
   torch::Tensor const& compute(std::string ab,
                                std::initializer_list<torch::Tensor> args) const;
 
   //! \brief Calculate the equilibrium state given temperature and pressure
+  /*!
+   * \param[in] temp temperature, K
+   * \param[in] pres pressure, Pa
+   * \param[in,out] xfrac mole fraction, (..., 1 + ny)
+   * \return difference between the output and input mole fraction
+   */
   torch::Tensor forward(torch::Tensor temp, torch::Tensor pres,
-                        torch::Tensor xfrac);
+                        torch::Tensor& xfrac);
 
  private:
   //! cache

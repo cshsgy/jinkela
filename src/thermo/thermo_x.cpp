@@ -61,18 +61,8 @@ void ThermoXImpl::reset() {
               "uref_R size mismatch");
 
   auto mud = constants::Rgas / options.Rd();
-  mu =
-      register_buffer("mu", torch::tensor(options.mu_ratio(), torch::kFloat64));
-
-  auto cp_R = torch::tensor(options.cref_R(), torch::kFloat64);
-  cp_R.narrow(0, 0, nvapor) += 1.;
-
-  auto href_R = torch::tensor(options.uref_R(), torch::kFloat64);
-  href_R.narrow(0, 0, nvapor) += options.Tref();
-
-  // J/mol/K
-  cp0 = register_buffer("cp0", cp_R * constants::Rgas);
-  h0 = register_buffer("h0", href_R * constants::Rgas - cp0 * options.Tref());
+  mu = register_buffer(
+      "mu", mud * torch::tensor(options.mu_ratio(), torch::kFloat64));
 
   // populate stoichiometry matrix
   int nspecies = options.species().size();
@@ -160,7 +150,7 @@ torch::Tensor ThermoXImpl::compute(
 }
 
 torch::Tensor ThermoXImpl::forward(torch::Tensor temp, torch::Tensor pres,
-                                   torch::Tensor xfrac) {
+                                   torch::Tensor &xfrac) {
   auto xfrac0 = xfrac.clone();
 
   // prepare data

@@ -176,7 +176,7 @@ torch::Tensor ThermoYImpl::compute(
 }
 
 torch::Tensor ThermoYImpl::forward(torch::Tensor rho, torch::Tensor intEng,
-                                   torch::Tensor yfrac) {
+                                   torch::Tensor &yfrac) {
   auto yfrac0 = yfrac.clone();
   auto ivol = compute("DY->V", {rho, yfrac});
 
@@ -188,14 +188,11 @@ torch::Tensor ThermoYImpl::forward(torch::Tensor rho, torch::Tensor intEng,
   pres = compute("VT->P", {temp, ivol});
   auto conc = ivol * inv_mu;
 
-  // dimensional expanded cv and u0 array
-  auto u0 = torch::zeros({1 + (int)options.uref_R().size()}, conc.options());
-  auto cv = torch::zeros({1 + (int)options.cref_R().size()}, conc.options());
+  // J/kg -> J/mol
+  auto u0_mole = u0 / inv_mu;
 
-  u0.narrow(0, 1, options.uref_R().size()) = u0_R * constants::Rgas;
-  cv.narrow(0, 1, options.cref_R().size()) =
-      constants::Rgas * torch::tensor(options.cref_R(), conc.options());
-  cv[0] = constants::Rgas / (options.gammad() - 1.);
+  // J(kg K) -> J/(mol K)
+  auto cv0_mole = cv0 / inv_mu;
 
   // prepare data
   auto iter =
@@ -207,8 +204,8 @@ torch::Tensor ThermoYImpl::forward(torch::Tensor rho, torch::Tensor intEng,
           .add_owned_output(temp.unsqueeze(-1))
           .add_owned_input(intEng.unsqueeze(-1))
           .add_input(stoich)
-          .add_input(u0)
-          .add_input(cv0)
+          .add_input(u0_mole)
+          .add_input(cv0_mole)
           .build();
 
   // prepare svp function
