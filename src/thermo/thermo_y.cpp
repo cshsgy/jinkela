@@ -188,12 +188,6 @@ torch::Tensor ThermoYImpl::forward(torch::Tensor rho, torch::Tensor intEng,
   pres = compute("VT->P", {temp, ivol});
   auto conc = ivol * inv_mu;
 
-  // J/kg -> J/mol
-  auto u0_mole = u0 / inv_mu;
-
-  // J(kg K) -> J/(mol K)
-  auto cv0_mole = cv0 / inv_mu;
-
   // prepare data
   auto iter =
       at::TensorIteratorConfig()
@@ -204,8 +198,8 @@ torch::Tensor ThermoYImpl::forward(torch::Tensor rho, torch::Tensor intEng,
           .add_owned_output(temp.unsqueeze(-1))
           .add_owned_input(intEng.unsqueeze(-1))
           .add_input(stoich)
-          .add_input(u0_mole)
-          .add_input(cv0_mole)
+          .add_owned_input(u0 / inv_mu)   // J/kg -> J/mol
+          .add_owned_input(cv0 / inv_mu)  // J(kg K) -> J/(mol K)
           .build();
 
   // prepare svp function
@@ -359,8 +353,8 @@ void ThermoYImpl::_intEng_to_temp(torch::Tensor ivol, torch::Tensor intEng,
   }
 }
 
-void _temp_to_pres(torch::Tensor ivol, torch::Tensor temp,
-                   torch::Tensor &out) const {
+void ThermoYImpl::_temp_to_pres(torch::Tensor ivol, torch::Tensor temp,
+                                torch::Tensor &out) const {
   int ngas = 1 + options.vapor_ids().size();
 
   // kg/m^3 -> mol/m^3

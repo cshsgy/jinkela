@@ -109,6 +109,12 @@ class ThermoYImpl : public torch::nn::Cloneable<ThermoYImpl> {
 
   //! \brief Perform saturation adjustment
   /*!
+   * This function adjusts the mass fraction to account for saturation
+   * conditions. It modifies the input mass fraction tensor in place.
+   * After calling this function, equilibrium temperature (T) and pressure (P)
+   * will be cached and can be accessed later using `buffer("T")` and
+   * `buffer("P")`.
+   *
    * \param[in] rho density
    * \param[in] intEng total internal energy [J/m^3]
    * \param[in,out] yfrac mass fraction, (ny, ...)
