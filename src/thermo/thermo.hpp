@@ -10,6 +10,8 @@
 #include <torch/nn/modules/container/any.h>
 
 // kintera
+#include <kintera/constants.h>
+
 #include <kintera/utils/func2.hpp>
 
 #include "eval_uh.hpp"
@@ -105,7 +107,7 @@ class ThermoYImpl : public torch::nn::Cloneable<ThermoYImpl> {
 
   //! \brief perform conversions
   torch::Tensor const& compute(std::string ab,
-                               std::initializer_list<torch::Tensor> args) const;
+                               std::initializer_list<torch::Tensor> args);
 
   //! \brief Perform saturation adjustment
   /*!
@@ -220,7 +222,7 @@ class ThermoXImpl : public torch::nn::Cloneable<ThermoXImpl> {
    * \return result of the conversion
    */
   torch::Tensor const& compute(std::string ab,
-                               std::initializer_list<torch::Tensor> args) const;
+                               std::initializer_list<torch::Tensor> args);
 
   //! \brief Calculate the equilibrium state given temperature and pressure
   /*!

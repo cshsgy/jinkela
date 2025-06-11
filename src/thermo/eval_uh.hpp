@@ -3,10 +3,10 @@
 // torch
 #include <torch/torch.h>
 
-// kintera
-#include "thermo.hpp"
-
 namespace kintera {
+
+// Forward declaration
+struct ThermoOptions;
 
 torch::Tensor eval_cv_R(torch::Tensor temp, torch::Tensor conc,
                         ThermoOptions const& op);

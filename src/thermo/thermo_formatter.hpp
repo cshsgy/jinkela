@@ -57,11 +57,27 @@ struct fmt::formatter<kintera::ThermoOptions> {
       }
     }
 
+    std::ostringstream cref;
+    for (size_t i = 0; i < p.cref_R().size(); ++i) {
+      cref << p.cref_R()[i];
+      if (i != p.cref_R().size() - 1) {
+        cref << ", ";
+      }
+    }
+
+    std::ostringstream uref;
+    for (size_t i = 0; i < p.uref_R().size(); ++i) {
+      uref << p.uref_R()[i];
+      if (i != p.uref_R().size() - 1) {
+        uref << ", ";
+      }
+    }
+
     return fmt::format_to(
         ctx.out(),
-        "(Rd = {:.2f}; gammad = {}; vapors = ({}); clouds = "
+        "(Rd = {:.2f}; cv_R = {}; u0_R = {}; vapors = ({}); clouds = "
         "({}); Tref = {}; Pref = {}; react = ({})); species = ({})",
-        p.Rd(), p.gammad(), vapors.str(), clouds.str(), p.Tref(), p.Pref(),
-        reactions.str(), species.str());
+        p.Rd(), cref.str(), uref.str(), vapors.str(), clouds.str(), p.Tref(),
+        p.Pref(), reactions.str(), species.str());
   }
 };

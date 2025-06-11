@@ -98,8 +98,8 @@ void ThermoXImpl::reset() {
   _cp = register_buffer("cp", torch::empty({0}));
 }
 
-torch::Tensor ThermoXImpl::compute(
-    std::string ab, std::initializer_list<torch::Tensor> args) const {
+torch::Tensor const &ThermoXImpl::compute(
+    std::string ab, std::initializer_list<torch::Tensor> args) {
   if (ab == "X->Y") {
     _X.resize_as_(*args.begin());
     _X.copy_(*args.begin());
@@ -135,6 +135,7 @@ torch::Tensor ThermoXImpl::compute(
     return _V;
   } else if (ab == "TPV->S") {
     // TODO(cli)
+    return _S;
   } else if (ab == "THS->G") {
     _T.resize_as_(*args.begin());
     _T.copy_(*args.begin());
@@ -220,8 +221,9 @@ void ThermoXImpl::_xfrac_to_conc(torch::Tensor temp, torch::Tensor pres,
     auto cz = eval_czh(temp, conc_gas, options);
     auto cz_ddC = eval_czh_ddC(temp, conc_gas, options);
     auto conc_gas_pre = conc_gas.clone();
-    conc_gas -= (cz * conc_gas - ideal_gas_conc) / (cz_ddC * conc_gas + cz);
-    if ((conc_gas - conc_gas_pre).abs().max().item<double>() < options.ftol()) {
+    conc_gas += (ideal_gas_conc - cz * conc_gas) / (cz_ddC * conc_gas + cz);
+    if ((1. - conc_gas_pre / conc_gas).abs().max().item<double>() <
+        options.ftol()) {
       break;
     }
   }

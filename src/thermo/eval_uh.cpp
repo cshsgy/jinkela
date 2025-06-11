@@ -1,6 +1,9 @@
 // kintera
 #include "eval_uh.hpp"
 
+#include <kintera/constants.h>
+
+#include "thermo.hpp"
 #include "thermo_dispatch.hpp"
 
 namespace kintera {
@@ -103,7 +106,7 @@ torch::Tensor eval_intEng_R(torch::Tensor temp, torch::Tensor conc,
                   .build();
 
   // call the evaluation function
-  at::native::call_with_TC(intEng_R.device().type(), iter,
+  at::native::call_with_TC(intEng_R_extra.device().type(), iter,
                            op.intEng_R_extra().data());
 
   auto cref_R = torch::tensor(op.cref_R(), temp.options());

@@ -14,7 +14,7 @@ void call_integrate_z_cpu(at::TensorIterator &iter, double dz,
 
 void integrate_z_(torch::Tensor temp, torch::Tensor pres, torch::Tensor xfrac,
                   double dz, std::string method, double grav, double adTdz,
-                  ThermoX const &thermo) {
+                  ThermoX &thermo) {
   // prepare reduced stoichiometry matrix
   int nspecies = thermo->options.species().size();
   int ngas = 1 + thermo->options.vapor_ids().size();

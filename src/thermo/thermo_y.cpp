@@ -107,8 +107,8 @@ void ThermoYImpl::reset() {
   _cv = register_buffer("cv", torch::empty({0}));
 }
 
-torch::Tensor ThermoYImpl::compute(
-    std::string ab, std::initializer_list<torch::Tensor> args) const {
+torch::Tensor const &ThermoYImpl::compute(
+    std::string ab, std::initializer_list<torch::Tensor> args) {
   if (ab == "V->Y") {
     _V.resize_as_(*args.begin());
     _V.copy_(*args.begin());
@@ -146,21 +146,24 @@ torch::Tensor ThermoYImpl::compute(
     _V.resize_as_(*(args.begin() + 1));
     _V.copy_(*(args.begin() + 1));
     _temp_to_intEng(_T, _V, _U);
+    return _U;
   } else if (ab == "VU->T") {
     _V.resize_as_(*args.begin());
     _V.copy_(*args.begin());
     _U.resize_as_(*(args.begin() + 1));
     _U.copy_(*(args.begin() + 1));
     _intEng_to_temp(_V, _U, _T);
-    return _U;
+    return _T;
   } else if (ab == "VT->P") {
     _V.resize_as_(*args.begin());
     _V.copy_(*args.begin());
     _T.resize_as_(*(args.begin() + 1));
     _T.copy_(*(args.begin() + 1));
     _temp_to_pres(_V, _T, _P);
+    return _P;
   } else if (ab == "PVT->S") {
     // TODO(cli)
+    return _S;
   } else if (ab == "TUS->F") {
     _T.resize_as_(*args.begin());
     _T.copy_(*args.begin());
@@ -181,11 +184,11 @@ torch::Tensor ThermoYImpl::forward(torch::Tensor rho, torch::Tensor intEng,
   auto ivol = compute("DY->V", {rho, yfrac});
 
   // initial guess
-  auto &temp = buffer("T");
-  auto &pres = buffer("P");
+  auto &temp = _T;
+  auto &pres = _P;
 
-  temp = compute("VU->T", {ivol, conc});
-  pres = compute("VT->P", {temp, ivol});
+  temp = compute("VU->T", {ivol, intEng});
+  pres = compute("VT->P", {ivol, temp});
   auto conc = ivol * inv_mu;
 
   // prepare data
@@ -307,10 +310,27 @@ void ThermoYImpl::_yfrac_to_ivol(torch::Tensor rho, torch::Tensor yfrac,
 void ThermoYImpl::_pres_to_temp(torch::Tensor pres, torch::Tensor ivol,
                                 torch::Tensor &out) const {
   int ngas = 1 + options.vapor_ids().size();
+
   // kg/m^3 -> mol/m^3
-  auto conc = ivol * inv_mu;
-  auto cz = eval_czh(temp, conc, options).narrow(-1, 0, ngas);
-  out = pres / ((cz * conc.narrow(-1, 0, ngas)).sum(-1) * constants::Rgas);
+  auto conc_gas = (ivol * inv_mu).narrow(-1, 0, ngas);
+
+  out = pres / (conc_gas.sum(-1) * constants::Rgas);
+  int iter = 0;
+  while (iter++ < options.max_iter()) {
+    auto cz = eval_czh(out, conc_gas, options);
+    auto func = out * (cz * conc_gas).sum(-1) - pres / constants::Rgas;
+    auto cv_R = eval_cv_R(out, conc_gas, options);
+    auto cp_R = eval_cp_R(out, conc_gas, options);
+    auto temp_pres = out.clone();
+    out += func / ((cp_R - cv_R) * conc_gas).sum(-1);
+    if ((1. - temp_pres / out).abs().max().item<double>() < options.ftol()) {
+      break;
+    }
+  }
+
+  if (iter >= options.max_iter()) {
+    TORCH_WARN("ThermoYImpl::_pres_to_temp: max iterations reached");
+  }
 }
 
 void ThermoYImpl::_cv_vol(torch::Tensor ivol, torch::Tensor temp,
@@ -343,7 +363,7 @@ void ThermoYImpl::_intEng_to_temp(torch::Tensor ivol, torch::Tensor intEng,
     auto cv = eval_cv_R(out, conc, options) * constants::Rgas;
     auto temp_pre = out.clone();
     out += (intEng - (u * conc).sum(-1)) / (cv * conc).sum(-1);
-    if ((out - temp_pre).abs().max().item<double>() < options.ftol()) {
+    if ((1. - temp_pre / out).abs().max().item<double>() < options.ftol()) {
       break;
     }
   }

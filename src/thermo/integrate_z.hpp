@@ -10,6 +10,6 @@ namespace kintera {
 
 void integrate_z_(torch::Tensor temp, torch::Tensor pres, torch::Tensor xfrac,
                   double dz, std::string method, double grav, double adTdz,
-                  ThermoX const& thermo);
+                  ThermoX &thermo);
 
 }  // namespace kintera

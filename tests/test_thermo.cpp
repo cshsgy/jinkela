@@ -18,25 +18,6 @@
 using namespace kintera;
 using namespace torch::indexing;
 
-TEST_P(DeviceTest, feps) {
-  auto op_thermo = ThermoOptions::from_yaml("jupiter.yaml");
-
-  ThermoY thermo(op_thermo);
-  thermo->to(device, dtype);
-
-  int ny =
-      thermo->options.vapor_ids().size() + thermo->options.cloud_ids().size();
-  auto yfrac = torch::zeros({ny, 1, 2, 3}, torch::device(device).dtype(dtype));
-
-  for (int i = 0; i < ny; ++i) yfrac[i] = 0.01 * (i + 1);
-
-  auto feps = thermo->f_eps(yfrac);
-  std::cout << "feps = " << feps << std::endl;
-
-  auto fsig = thermo->f_sig(yfrac);
-  std::cout << "fsig = " << fsig << std::endl;
-}
-
 TEST_P(DeviceTest, thermo_y) {
   auto op_thermo = ThermoOptions::from_yaml("jupiter.yaml");
 
