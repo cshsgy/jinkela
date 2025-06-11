@@ -36,8 +36,12 @@ ThermoXImpl::ThermoXImpl(const ThermoOptions &options_) : options(options_) {
     options.cp_R_extra().push_back(nullptr);
   }
 
-  while (options.compress_z().size() <= nvapor) {
-    options.compress_z().push_back(nullptr);
+  while (options.czh().size() < options.species().size()) {
+    options.czh().push_back(nullptr);
+  }
+
+  while (options.czh().size() < options.species().size()) {
+    options.czh_ddC().push_back(nullptr);
   }
 
   reset();
@@ -54,9 +58,9 @@ void ThermoXImpl::reset() {
   TORCH_CHECK(options.uref_R().size() == nvapor + ncloud,
               "uref_R size mismatch");
 
-  mu_ratio_m1 = register_buffer(
-      "mu_ratio_m1", torch::tensor(options.mu_ratio(), torch::kFloat64));
-  mu_ratio_m1 -= 1.;
+  auto mud = constants::Rgas / options.Rd();
+  mu =
+      register_buffer("mu", torch::tensor(options.mu_ratio(), torch::kFloat64));
 
   auto cp_R = torch::tensor(options.cref_R(), torch::kFloat64);
   cp_R.narrow(0, 0, nvapor) += 1.;
@@ -65,11 +69,8 @@ void ThermoXImpl::reset() {
   href_R.narrow(0, 0, nvapor) += options.Tref();
 
   // J/mol/K
-  cp_ratio_m1 = register_buffer(
-      "cp_ratio_m1", cp_R * (options.gammad() - 1.) / options.gammad());
-  cp_ratio_m1 -= 1.;
-
-  h0_R = register_buffer("h0_R", href_R - cp_R * options.Tref());
+  cp0 = register_buffer("cp0", cp_R * constants::Rgas);
+  h0 = register_buffer("h0", href_R * constants::Rgas - cp0 * options.Tref());
 
   // populate stoichiometry matrix
   int nspecies = options.species().size();
@@ -93,31 +94,42 @@ void ThermoXImpl::reset() {
   }
 }
 
-torch::Tensor ThermoXImpl::f_psi(torch::Tensor xfrac) const {
-  int nmass = xfrac.size(-1) - 1;
-  return 1. + xfrac.narrow(-1, 1, nmass).matmul(cp_ratio_m1);
-}
-
-torch::Tensor ThermoXImpl::compute(std::string ab,
-                                   std::initializer_list<torch::Tensor> args,
-                                   torch::optional<torch::Tensor> out) const {
+torch::Tensor ThermoXImpl::compute(
+    std::string ab, std::initializer_list<torch::Tensor> args) const {
   if (ab == "X->Y") {
-    out = _xfrac_to_yfrac(*args.begin());
-  } else if (ab == "TC->H") {
-    out = _temp_to_enthalpy(*args.begin(), *(args.begin() + 1), out);
-  } else if (ab == "TC->cp") {
-    out = _cp_mean(*args.begin(), *(args.begin() + 1), out);
-  } else if (ab == "TPX->C") {
-    out =
-        _xfrac_to_conc(*args.begin(), *(args.begin() + 1), *(args.begin() + 2));
+    _X.resize_as_(*args.begin());
+    _X.copy_(*args.begin());
+    _xfrac_to_yfrac(_X, _Y);
+  } else if (ab == "V->D") {
+    _V.resize_as_(*args.begin());
+    _V.copy_(*args.begin());
+    _conc_to_dens(_V, _D);
+  } else if (ab == "VT->cp") {
+    _V.resize_as_(*args.begin());
+    _V.copy_(*args.begin());
+    _T.resize_as_(*(args.begin() + 1));
+    _T.copy_(*(args.begin() + 1));
+    _cp_mean(_V, _T, _cp);
+  } else if (ab == "VT->H") {
+    _V.resize_as_(*args.begin());
+    _V.copy_(*args.begin());
+    _T.resize_as_(*(args.begin() + 1));
+    _T.copy_(*(args.begin() + 1));
+    _temp_to_enthalpy(_V, _T, _H);
+  } else if (ab == "TPX->V") {
+    _T.resize_as_(*args.begin());
+    _T.copy_(*args.begin());
+    _P.resize_as_(*(args.begin() + 1));
+    _P.copy_(*(args.begin() + 1));
+    _X.resize_as_(*(args.begin() + 2));
+    _X.copy_(*(args.begin() + 2));
+    _xfrac_to_conc(_T, _P, _X, _V);
   } else if (ab == "TPX->D") {
     out =
         _temp_to_dens(*args.begin(), *(args.begin() + 1), *(args.begin() + 2));
   } else {
     TORCH_CHECK(false, "Unknown abbreviation: ", ab);
   }
-
-  return out.value_or(torch::Tensor());
 }
 
 torch::Tensor ThermoXImpl::forward(torch::Tensor temp, torch::Tensor pres,
@@ -208,9 +220,10 @@ torch::Tensor ThermoXImpl::_xfrac_to_conc(torch::Tensor temp,
 torch::Tensor ThermoXImpl::_temp_to_enthalpy(
     torch::Tensor temp, torch::Tensor conc,
     torch::optional<torch::Tensor> out) const {
+  int ngas = 1 + options.vapor_ids().size();
   auto intEng = eval_intEng_R(temp, conc, options) * constants::Rgas;
-  auto zRT = eval_compress_z(temp, conc, options) * constants::Rgas *
-             temp.unsqueeze(-1);
+  auto zRT = eval_czh(temp, conc, options).narrow(-1, 0, ngas) *
+             constants::Rgas * temp.unsqueeze(-1);
   int ngas = 1 + options.vapor_ids().size();
 
   if (out.has_value()) {
@@ -221,8 +234,8 @@ torch::Tensor ThermoXImpl::_temp_to_enthalpy(
   }
 }
 
-torch::Tensor ThermoXImpl::_cp_mean(torch::Tensor temp, torch::Tensor conc,
-                                    torch::optional<torch::Tensor> out) const {
+torch::Tensor ThermoXImpl::_cp_vol(torch::Tensor temp, torch::Tensor conc,
+                                   torch::optional<torch::Tensor> out) const {
   auto cp1 = eval_cp_R(temp, conc, options) * constants::Rgas;
   auto ctotal = conc.sum(-1);
 

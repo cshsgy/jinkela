@@ -61,7 +61,13 @@ struct ThermoOptions {
   ADD_ARG(std::vector<user_func2>, intEng_R_extra);
   ADD_ARG(std::vector<user_func2>, cv_R_extra);
   ADD_ARG(std::vector<user_func2>, cp_R_extra);
-  ADD_ARG(std::vector<user_func2>, compress_z);
+
+  //! This variable is funny. Because compressibility factor only applies to
+  //! gas and we need extra functions for cloud species, so we combined
+  //! compressibility factor and extra enthalpy functions into one variable
+  //! called czh, which has the size of nspcies
+  ADD_ARG(std::vector<user_func2>, czh);
+  ADD_ARG(std::vector<user_func2>, czh_ddC);
 
   ADD_ARG(std::vector<Nucleation>, react);
   ADD_ARG(std::vector<std::string>, species);
@@ -206,15 +212,6 @@ class ThermoXImpl : public torch::nn::Cloneable<ThermoXImpl> {
   explicit ThermoXImpl(const ThermoOptions& options_);
   void reset() override;
 
-  //! \brief multi-component cp correction
-  /*!
-   * Eq.71 in Li2019
-   * $ f_{\psi} = 1 + \sum_{i \in V \cup C} x_i(\sigma_{p,i} - 1) $
-   *
-   * \param xfrac mole fraction
-   */
-  torch::Tensor f_psi(torch::Tensor xfrac) const;
-
   //! \brief perform conversions
   torch::Tensor const& compute(std::string ab,
                                std::initializer_list<torch::Tensor> args) const;
@@ -225,7 +222,7 @@ class ThermoXImpl : public torch::nn::Cloneable<ThermoXImpl> {
 
  private:
   //! cache
-  torch::Tensor _T, _P, _X, _D, _Y, _V, _H, _S, _F, _G, _cp;
+  torch::Tensor _T, _P, _X, _Y, _D, _V, _H, _S, _G, _cp;
 
   //! \brief Calculate mass fraction from mole fraction
   /*!
@@ -263,7 +260,7 @@ class ThermoXImpl : public torch::nn::Cloneable<ThermoXImpl> {
       torch::optional<torch::Tensor> out = torch::nullopt) const;
 
   //! \brief calculatec cp
-  torch::Tensor _cp_mean(
+  torch::Tensor _cp_vol(
       torch::Tensor temp, torch::Tensor conc,
       torch::optional<torch::Tensor> out = torch::nullopt) const;
 };

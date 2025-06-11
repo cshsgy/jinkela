@@ -36,8 +36,12 @@ ThermoYImpl::ThermoYImpl(const ThermoOptions &options_) : options(options_) {
     options.cp_R_extra().push_back(nullptr);
   }
 
-  while (options.compress_z().size() <= nvapor) {
-    options.compress_z().push_back(nullptr);
+  while (options.czh().size() < options.species().size()) {
+    options.czh().push_back(nullptr);
+  }
+
+  while (options.czh_ddC().size() < options.species().size()) {
+    options.czh_ddC().push_back(nullptr);
   }
 
   reset();
@@ -166,8 +170,6 @@ torch::Tensor ThermoYImpl::compute(
   } else {
     TORCH_CHECK(false, "Unknown abbreviation: ", ab);
   }
-
-  return out.value_or(torch::Tensor());
 }
 
 torch::Tensor ThermoYImpl::forward(torch::Tensor rho, torch::Tensor intEng,
@@ -180,7 +182,7 @@ torch::Tensor ThermoYImpl::forward(torch::Tensor rho, torch::Tensor intEng,
   auto &pres = buffer("P");
 
   temp = compute("VU->T", {ivol, conc});
-  pres = compute("TV->P", {temp, ivol});
+  pres = compute("VT->P", {temp, ivol});
   auto conc = ivol * inv_mu;
 
   // dimensional expanded cv and u0 array
@@ -203,7 +205,7 @@ torch::Tensor ThermoYImpl::forward(torch::Tensor rho, torch::Tensor intEng,
           .add_owned_input(intEng.unsqueeze(-1))
           .add_input(stoich)
           .add_input(u0)
-          .add_input(cv_const)
+          .add_input(cv0)
           .build();
 
   // prepare svp function
@@ -317,7 +319,7 @@ void ThermoYImpl::_pres_to_temp(torch::Tensor pres, torch::Tensor ivol,
   int ngas = 1 + options.vapor_ids().size();
   // kg/m^3 -> mol/m^3
   auto conc = ivol * inv_mu;
-  auto zcompress = eval_compress_z(temp, conc, options);
+  auto zcompress = eval_czh(temp, conc, options).narrow(-1, 0, ngas);
   out =
       pres / ((zcompress * conc.narrow(-1, 0, ngas)).sum(-1) * constants::Rgas);
 }
@@ -365,7 +367,7 @@ void _temp_to_pres(torch::Tensor ivol, torch::Tensor temp,
   int ngas = 1 + options.vapor_ids().size();
   // kg/m^3 -> mol/m^3
   auto conc = ivol * inv_mu;
-  auto zcompress = eval_compress_z(temp, conc, options);
+  auto zcompress = eval_czh(temp, conc, options).narrow(-1, 0, ngas);
   out = constants::Rgas * temp * (zcompress * conc.narrow(-1, 0, ngas)).sum(-1);
 }
 
