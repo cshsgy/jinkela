@@ -58,13 +58,8 @@ ThermoOptions ThermoOptions::from_yaml(std::string const& filename) {
   }
 
   thermo.Rd(constants::Rgas / species_weights[0]);
-
-  thermo.mu_ratio().clear();
-  thermo.cref_R().clear();
-  thermo.uref_R().clear();
-
-  thermo.species().clear();
   thermo.species().push_back(species_names[0]);
+  thermo.mu_ratio().push_back(1.);
 
   // register vapors
   if (config["vapor"]) {
@@ -73,14 +68,12 @@ ThermoOptions ThermoOptions::from_yaml(std::string const& filename) {
                           sp.as<std::string>());
       TORCH_CHECK(it != species_names.end(), "vapor species ",
                   sp.as<std::string>(), " not found in species list");
-      thermo.vapor_ids().push_back(it - species_names.begin());
-      thermo.species().push_back(sp.as<std::string>());
-    }
-  }
 
-  for (int i = 0; i < thermo.vapor_ids().size(); ++i) {
-    auto id = thermo.vapor_ids()[i];
-    thermo.mu_ratio().push_back(species_weights[id] / species_weights[0]);
+      int id = it - species_names.begin();
+      thermo.vapor_ids().push_back(id);
+      thermo.species().push_back(sp.as<std::string>());
+      thermo.mu_ratio().push_back(species_weights[id] / species_weights[0]);
+    }
   }
 
   // register clouds
@@ -90,14 +83,12 @@ ThermoOptions ThermoOptions::from_yaml(std::string const& filename) {
                           sp.as<std::string>());
       TORCH_CHECK(it != species_names.end(), "cloud species ",
                   sp.as<std::string>(), " not found in species list");
-      thermo.cloud_ids().push_back(it - species_names.begin());
-      thermo.species().push_back(sp.as<std::string>());
-    }
-  }
 
-  for (int i = 0; i < thermo.cloud_ids().size(); ++i) {
-    auto id = thermo.cloud_ids()[i];
-    thermo.mu_ratio().push_back(species_weights[id] / species_weights[0]);
+      int id = it - species_names.begin();
+      thermo.cloud_ids().push_back(id);
+      thermo.species().push_back(sp.as<std::string>());
+      thermo.mu_ratio().push_back(species_weights[id] / species_weights[0]);
+    }
   }
 
   // register reactions

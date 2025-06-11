@@ -54,11 +54,12 @@ void ThermoYImpl::reset() {
   int ncloud = options.cloud_ids().size();
 
   TORCH_CHECK(options.mu_ratio().size() == 1 + nvapor + ncloud,
-              "mu_ratio size mismatch");
-  TORCH_CHECK(options.cref_R().size() == 1 + nvapor + ncloud,
-              "cref_R size mismatch");
-  TORCH_CHECK(options.uref_R().size() == 1 + nvapor + ncloud,
-              "uref_R size mismatch");
+              "mu_ratio size = ", options.mu_ratio().size(),
+              ". Expected = ", 1 + nvapor + ncloud);
+
+  // restrict cref and uref
+  options.cref_R().resize(1 + nvapor + ncloud);
+  options.uref_R().resize(1 + nvapor + ncloud);
 
   auto mud = constants::Rgas / options.Rd();
   inv_mu = register_buffer(

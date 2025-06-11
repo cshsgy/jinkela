@@ -31,7 +31,6 @@ TEST_P(DeviceTest, thermo_y) {
   for (int i = 0; i < ny; ++i) yfrac[i] = 0.01 * (i + 1);
 
   auto xfrac = thermo->compute("Y->X", {yfrac});
-  std::cout << "xfrac = " << xfrac << std::endl;
 
   EXPECT_EQ(torch::allclose(
                 xfrac.sum(-1),
@@ -40,8 +39,11 @@ TEST_P(DeviceTest, thermo_y) {
             true);
 
   auto rho = torch::ones({1, 2, 3}, torch::device(device).dtype(dtype));
-  auto conc = thermo->compute("DY->C", {rho, yfrac});
-  std::cout << "conc = " << conc << std::endl;
+  auto dens = thermo->compute("DY->V", {rho, yfrac});
+
+  EXPECT_EQ(torch::allclose(rho, dens.sum(-1),
+                            /*rtol=*/1e-4, /*atol=*/1e-4),
+            true);
 }
 
 TEST_P(DeviceTest, thermo_x) {
