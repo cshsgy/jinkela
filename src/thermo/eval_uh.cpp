@@ -53,7 +53,7 @@ torch::Tensor eval_cp_R(torch::Tensor temp, torch::Tensor conc,
 torch::Tensor eval_czh(torch::Tensor temp, torch::Tensor conc,
                        ThermoOptions const& op) {
   auto cz = torch::zeros_like(conc);
-  cz.narrow(-1, 0, 1 + op.vapor_ids().size()) = 1;
+  cz.narrow(-1, 0, 1 + op.vapor_ids().size()) = 1.;
 
   // bundle iterator
   auto iter = at::TensorIteratorConfig()

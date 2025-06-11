@@ -148,8 +148,8 @@ torch::Tensor ThermoXImpl::compute(
   } else if (ab == "THS->G") {
     _T.resize_as_(*args.begin());
     _T.copy_(*args.begin());
-    _U.resize_as_(*(args.begin() + 1));
-    _U.copy_(*(args.begin() + 1));
+    _H.resize_as_(*(args.begin() + 1));
+    _H.copy_(*(args.begin() + 1));
     _S.resize_as_(*(args.begin() + 2));
     _S.copy_(*(args.begin() + 2));
     _G = _H - _T * _S;
@@ -217,20 +217,33 @@ void ThermoXImpl::_xfrac_to_yfrac(torch::Tensor xfrac,
 void ThermoXImpl::_xfrac_to_conc(torch::Tensor temp, torch::Tensor pres,
                                  torch::Tensor xfrac,
                                  torch::Tensor &out) const {
-  auto nvapor = options.vapor_ids().size();
-  auto ncloud = options.cloud_ids().size();
+  int ngas = 1 + options.vapor_ids().size();
+  int ncloud = options.cloud_ids().size();
 
-  auto gas_conc = pres / (temp * constants::Rgas);
-  auto xgas = 1. - xfrac.narrow(-1, 1 + nvapor, ncloud).sum(-1);
+  auto xgas = xfrac.narrow(-1, 0, ngas).sum(-1);
+  auto ideal_gas_conc = xfrac.narrow(-1, 0, ngas) * pres /
+                        (temp.unsqueeze(-1) * constants::Rgas * xgas);
 
-  auto conc = torch::empty_like(xfrac);
-  conc.narrow(-1, 0, 1 + nvapor) =
-      gas_conc * xfrac.narrow(-1, 0, 1 + nvapor) / xgas.unsqueeze(-1);
-  conc.narrow(-1, 1 + nvapor, ncloud) = xfrac.narrow(-1, 1 + nvapor, ncloud) /
-                                        xfrac.select(-1, 0).unsqueeze(-1) *
-                                        conc.select(-1, 0).unsqueeze(-1);
+  auto conc_gas = ideal_gas_conc.clone();
+  int iter = 0;
+  while (iter++ < options.max_iter()) {
+    auto cz = eval_czh(temp, conc_gas, options);
+    auto cz_ddC = eval_czh_ddC(temp, conc_gas, options);
+    auto conc_gas_pre = conc_gas.clone();
+    conc_gas -= (cz * conc_gas - ideal_gas_conc) / (cz_ddC * conc_gas + cz);
+    if ((conc_gas - conc_gas_pre).abs().max().item<double>() < options.ftol()) {
+      break;
+    }
+  }
 
-  return conc;
+  if (iter >= options.max_iter()) {
+    TORCH_WARN("ThermoX:_xfrac_to_conc: max iteration reached");
+  }
+
+  out.narrow(-1, 0, ngas) = conc_gas;
+  out.narrow(-1, ngas, ncloud) = conc_gas.select(-1, 0).unsqueeze(-1) *
+                                 xfrac.narrow(-1, ngas, ncloud) /
+                                 xfrac.select(-1, 0).unsqueeze(-1);
 }
 
 }  // namespace kintera

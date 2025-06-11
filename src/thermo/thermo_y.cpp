@@ -350,9 +350,9 @@ void ThermoYImpl::_intEng_to_temp(torch::Tensor ivol, torch::Tensor intEng,
   while (iter++ < options.max_iter()) {
     auto u = eval_intEng_R(out, conc, options) * constants::Rgas;
     auto cv = eval_cv_R(out, conc, options) * constants::Rgas;
-    auto temp0 = out.clone();
+    auto temp_pre = out.clone();
     out += (intEng - (u * conc).sum(-1)) / (cv * conc).sum(-1);
-    if ((out - temp0).abs().max().item<double>() < options.ftol()) {
+    if ((out - temp_pre).abs().max().item<double>() < options.ftol()) {
       break;
     }
   }

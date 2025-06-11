@@ -68,6 +68,10 @@ struct ThermoOptions {
   //! compressibility factor and extra enthalpy functions into one variable
   //! called czh, which has the size of nspcies
   ADD_ARG(std::vector<user_func2>, czh);
+
+  //! Similarly, the derivative of compressibility factor with respect to
+  //! concentration is stored here, with first 'ngas' entries being
+  //! valid numbers
   ADD_ARG(std::vector<user_func2>, czh_ddC);
 
   ADD_ARG(std::vector<Nucleation>, react);
@@ -250,6 +254,11 @@ class ThermoXImpl : public torch::nn::Cloneable<ThermoXImpl> {
   }
 
   //! \brief calculate enthalpy
+  /*!
+   * \param[in] temp temperature, K
+   * \param[in] conc mole concentration, (..., 1 + ny)
+   * \param[out] out volumetric enthalpy, J/m^3, (...)
+   */
   void _temp_to_enthalpy(torch::Tensor temp, torch::Tensor conc,
                          torch::Tensor& out) const {
     auto hi = eval_enthalpy_R(temp, conc, options) * constants::Rgas;
@@ -257,6 +266,12 @@ class ThermoXImpl : public torch::nn::Cloneable<ThermoXImpl> {
   }
 
   //! \brief Calculate concentration from mole fraction
+  /*
+   * \param[in] temp temperature, K
+   * \param[in] pres pressure, Pa
+   * \param[in] xfrac mole fractions, (..., 1 + ny)
+   * \param[out] out mole concentration, mol/m^3, (..., 1 + ny)
+   */
   void _xfrac_to_conc(torch::Tensor temp, torch::Tensor pres,
                       torch::Tensor xfrac, torch::Tensor& out) const;
 };
