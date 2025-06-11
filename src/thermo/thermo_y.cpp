@@ -1,6 +1,8 @@
 // kintera
 #include <kintera/constants.h>
 
+#include <kintera/utils/check_resize.hpp>
+
 #include "eval_uh.hpp"
 #include "thermo.hpp"
 #include "thermo_dispatch.hpp"
@@ -93,15 +95,16 @@ void ThermoYImpl::reset() {
   }
 
   // populate buffers
+  _D = register_buffer("D", torch::empty({0}));
   _P = register_buffer("P", torch::empty({0}));
   _Y = register_buffer("Y", torch::empty({0}));
   _X = register_buffer("X", torch::empty({0}));
   _V = register_buffer("V", torch::empty({0}));
   _T = register_buffer("T", torch::empty({0}));
-  _cv = register_buffer("cv", torch::empty({0}));
   _U = register_buffer("U", torch::empty({0}));
   _S = register_buffer("S", torch::empty({0}));
   _F = register_buffer("F", torch::empty({0}));
+  _cv = register_buffer("cv", torch::empty({0}));
 }
 
 torch::Tensor ThermoYImpl::compute(
@@ -235,8 +238,7 @@ torch::Tensor ThermoYImpl::forward(torch::Tensor rho, torch::Tensor intEng,
   return yfrac - yfrac0;
 }
 
-torch::Tensor ThermoYImpl::_ivol_to_yfrac(torch::Tensor ivol,
-                                          torch::Tensor &out) const {
+void ThermoYImpl::_ivol_to_yfrac(torch::Tensor ivol, torch::Tensor &out) const {
   int ny = ivol.size(-1) - 1;
   TORCH_CHECK(ny == options.vapor_ids().size() + options.cloud_ids().size(),
               "mass fraction size mismatch");
@@ -247,7 +249,7 @@ torch::Tensor ThermoYImpl::_ivol_to_yfrac(torch::Tensor ivol,
   }
   vec[0] = ny;
 
-  out = torch::empty(vec, ivol.options());
+  out = check_resize(out, vec, ivol.options());
 
   // (..., ny + 1) -> (ny, ...)
   int ndim = ivol.dim();
@@ -256,8 +258,7 @@ torch::Tensor ThermoYImpl::_ivol_to_yfrac(torch::Tensor ivol,
   }
   vec[ndim - 1] = 0;
 
-  yfrac.permute(vec) = ivol.narrow(-1, 1, ny) / ivol.sum(-1, /*keepdim=*/true);
-  return yfrac;
+  out.permute(vec) = ivol.narrow(-1, 1, ny) / ivol.sum(-1, /*keepdim=*/true);
 }
 
 void ThermoYImpl::_yfrac_to_xfrac(torch::Tensor yfrac,
@@ -272,7 +273,7 @@ void ThermoYImpl::_yfrac_to_xfrac(torch::Tensor yfrac,
   }
   vec.back() = ny + 1;
 
-  out = torch::empty(vec, yfrac.options());
+  out = check_resize(out, vec, yfrac.options());
 
   // (ny, ...) -> (..., ny + 1)
   int ndim = yfrac.dim();
@@ -287,7 +288,6 @@ void ThermoYImpl::_yfrac_to_xfrac(torch::Tensor yfrac,
   auto sum = 1. + yfrac.permute(vec).matmul(mud * inv_mu.narrow(0, 1, ny) - 1.);
   out.narrow(-1, 1, ny) /= sum.unsqueeze(-1);
   out.select(-1, 0) = 1. - out.narrow(-1, 1, ny).sum(-1);
-  return out;
 }
 
 void ThermoYImpl::_yfrac_to_ivol(torch::Tensor rho, torch::Tensor yfrac,
@@ -300,7 +300,7 @@ void ThermoYImpl::_yfrac_to_ivol(torch::Tensor rho, torch::Tensor yfrac,
   vec.erase(vec.begin());
   vec.push_back(1 + ny);
 
-  out = torch::empty(vec, yfrac.options());
+  out = check_resize(out, vec, yfrac.options());
 
   // (ny, ...) -> (..., ny + 1)
   int ndim = yfrac.dim();
@@ -311,7 +311,6 @@ void ThermoYImpl::_yfrac_to_ivol(torch::Tensor rho, torch::Tensor yfrac,
 
   out.select(-1, 0) = rho * (1. - yfrac.sum(0));
   out.narrow(-1, 1, ny) = (rho.unsqueeze(-1) * yfrac.permute(vec));
-  return out;
 }
 
 void ThermoYImpl::_pres_to_temp(torch::Tensor pres, torch::Tensor ivol,
@@ -319,9 +318,8 @@ void ThermoYImpl::_pres_to_temp(torch::Tensor pres, torch::Tensor ivol,
   int ngas = 1 + options.vapor_ids().size();
   // kg/m^3 -> mol/m^3
   auto conc = ivol * inv_mu;
-  auto zcompress = eval_czh(temp, conc, options).narrow(-1, 0, ngas);
-  out =
-      pres / ((zcompress * conc.narrow(-1, 0, ngas)).sum(-1) * constants::Rgas);
+  auto cz = eval_czh(temp, conc, options).narrow(-1, 0, ngas);
+  out = pres / ((cz * conc.narrow(-1, 0, ngas)).sum(-1) * constants::Rgas);
 }
 
 void ThermoYImpl::_cv_vol(torch::Tensor ivol, torch::Tensor temp,
@@ -330,7 +328,6 @@ void ThermoYImpl::_cv_vol(torch::Tensor ivol, torch::Tensor temp,
   auto conc = ivol * inv_mu;
   auto cv = eval_cv_R(temp, conc, options) * constants::Rgas;
   out = (cv * conc).sum(-1);
-  return out;
 }
 
 void ThermoYImpl::_temp_to_intEng(torch::Tensor ivol, torch::Tensor temp,
@@ -339,7 +336,6 @@ void ThermoYImpl::_temp_to_intEng(torch::Tensor ivol, torch::Tensor temp,
   auto conc = ivol * inv_mu;
   auto u = eval_intEng_R(temp, conc, options) * constants::Rgas;
   out = (u * conc).sum(-1);
-  return out;
 }
 
 void ThermoYImpl::_intEng_to_temp(torch::Tensor ivol, torch::Tensor intEng,
@@ -360,15 +356,20 @@ void ThermoYImpl::_intEng_to_temp(torch::Tensor ivol, torch::Tensor intEng,
       break;
     }
   }
+
+  if (iter >= options.max_iter()) {
+    TORCH_WARN("ThermoYImpl::_intEng_to_temp: max iterations reached");
+  }
 }
 
 void _temp_to_pres(torch::Tensor ivol, torch::Tensor temp,
                    torch::Tensor &out) const {
   int ngas = 1 + options.vapor_ids().size();
+
   // kg/m^3 -> mol/m^3
   auto conc = ivol * inv_mu;
-  auto zcompress = eval_czh(temp, conc, options).narrow(-1, 0, ngas);
-  out = constants::Rgas * temp * (zcompress * conc.narrow(-1, 0, ngas)).sum(-1);
+  auto cz = eval_czh(temp, conc, options).narrow(-1, 0, ngas);
+  out = constants::Rgas * temp * (cz * conc.narrow(-1, 0, ngas)).sum(-1);
 }
 
 }  // namespace kintera

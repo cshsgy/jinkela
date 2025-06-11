@@ -12,6 +12,7 @@
 // kintera
 #include <kintera/utils/func2.hpp>
 
+#include "eval_uh.hpp"
 #include "nucleation.hpp"
 
 // arg
@@ -114,7 +115,7 @@ class ThermoYImpl : public torch::nn::Cloneable<ThermoYImpl> {
 
  private:
   //! cache
-  torch::Tensor _P, _Y, _X, _V, _T, _cv, _U, _S, _F;
+  torch::Tensor _D, _P, _Y, _X, _V, _T, _U, _S, _F, _cv;
 
   //! \brief specific volume (m^3/kg) to mass fraction
   /*
@@ -125,10 +126,6 @@ class ThermoYImpl : public torch::nn::Cloneable<ThermoYImpl> {
 
   //! \brief Calculate mole fraction from mass fraction
   /*!
-   * Eq.77 in Li2019
-   * $ x_i = \frac{y_i/\epsilon_i}{1. + \sum_{i \in V \cup C} y_i(1./\epsilon_i
-   * - 1.)} $
-   *
    * \param[in] yfrac mass fraction, (ny, ...)
    * \param[out] out mole fraction, (..., 1 + ny)
    */
@@ -222,47 +219,46 @@ class ThermoXImpl : public torch::nn::Cloneable<ThermoXImpl> {
 
  private:
   //! cache
-  torch::Tensor _T, _P, _X, _Y, _D, _V, _H, _S, _G, _cp;
+  torch::Tensor _T, _P, _X, _Y, _V, _D, _H, _S, _G, _cp;
 
   //! \brief Calculate mass fraction from mole fraction
   /*!
-   * Eq.76 in Li2019
-   * $ y_i = \frac{x_i \epsilon_i}{1. + \sum_{i \in V \cup C} x_i(\epsilon_i
-   * - 1.)} $
-   *
-   * \param xfrac mole fraction, (..., 1 + ny)
-   * \return mass fraction, (ny, ...)
+   * \param[in] xfrac mole fraction, (..., 1 + ny)
+   * \param[out] out mass fraction, (ny, ...)
    */
-  torch::Tensor _xfrac_to_yfrac(torch::Tensor xfrac) const;
+  void _xfrac_to_yfrac(torch::Tensor xfrac, torch::Tensor& out) const;
 
-  //! \brief Calculate concentration from mole fraction
-  /*
-   * $ C_i = \frac{x_i P}{R_d T_v} $
-   */
-  torch::Tensor _xfrac_to_conc(torch::Tensor temp, torch::Tensor pres,
-                               torch::Tensor xfrac) const;
-
-  //! \brief Calculate density from temperature, pressure and mole fraction
+  //! \brief Calculate total density
   /*!
-   * Eq.94 in Li2019
-   * $ \rho = \frac{P}{R_d T_v} $
-   *
-   * \param temp temperature, K
-   * \param pres pressure, pa
-   * \param xfrac mole fraction, (..., 1 + ny)
+   * \param[in] conc mole concentration, (..., 1 + ny)
+   * \param[out] out total density, kg/m^3, (...)
    */
-  torch::Tensor _temp_to_dens(torch::Tensor temp, torch::Tensor pres,
-                              torch::Tensor xfrac) const;
+  void _conc_to_dens(torch::Tensor conc, torch::Tensor& out) const {
+    out = (conc * mu).sum(-1);
+  }
+
+  //! \brief calculatec volumetric heat capacity
+  /*
+   * \param[in] temp temperature, K
+   * \param[in] conc mole concentration, (..., 1 + ny)
+   * \param[out] out volumetric heat capacity, J/(m^3 K), (...)
+   */
+  void _cp_vol(torch::Tensor temp, torch::Tensor conc,
+               torch::Tensor& out) const {
+    auto cp = eval_cp_R(temp, conc, options) * constants::Rgas;
+    out = (conc * cp).sum(-1);
+  }
 
   //! \brief calculate enthalpy
-  torch::Tensor _temp_to_enthalpy(
-      torch::Tensor temp, torch::Tensor conc,
-      torch::optional<torch::Tensor> out = torch::nullopt) const;
+  void _temp_to_enthalpy(torch::Tensor temp, torch::Tensor conc,
+                         torch::Tensor& out) const {
+    auto hi = eval_enthalpy_R(temp, conc, options) * constants::Rgas;
+    out = (conc * hi).sum(-1);
+  }
 
-  //! \brief calculatec cp
-  torch::Tensor _cp_vol(
-      torch::Tensor temp, torch::Tensor conc,
-      torch::optional<torch::Tensor> out = torch::nullopt) const;
+  //! \brief Calculate concentration from mole fraction
+  void _xfrac_to_conc(torch::Tensor temp, torch::Tensor pres,
+                      torch::Tensor xfrac, torch::Tensor& out) const;
 };
 TORCH_MODULE(ThermoX);
 

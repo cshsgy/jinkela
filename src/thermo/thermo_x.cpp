@@ -1,6 +1,8 @@
 // kintera
 #include <kintera/constants.h>
 
+#include <kintera/utils/check_resize.hpp>
+
 #include "eval_uh.hpp"
 #include "thermo.hpp"
 #include "thermo_dispatch.hpp"
@@ -92,6 +94,18 @@ void ThermoXImpl::reset() {
       }
     }
   }
+
+  // populate buffers
+  _T = register_buffer("T", torch::empty({0}));
+  _P = register_buffer("P", torch::empty({0}));
+  _X = register_buffer("X", torch::empty({0}));
+  _Y = register_buffer("Y", torch::empty({0}));
+  _V = register_buffer("V", torch::empty({0}));
+  _D = register_buffer("D", torch::empty({0}));
+  _H = register_buffer("H", torch::empty({0}));
+  _S = register_buffer("S", torch::empty({0}));
+  _G = register_buffer("G", torch::empty({0}));
+  _cp = register_buffer("cp", torch::empty({0}));
 }
 
 torch::Tensor ThermoXImpl::compute(
@@ -100,22 +114,26 @@ torch::Tensor ThermoXImpl::compute(
     _X.resize_as_(*args.begin());
     _X.copy_(*args.begin());
     _xfrac_to_yfrac(_X, _Y);
+    return _Y;
   } else if (ab == "V->D") {
     _V.resize_as_(*args.begin());
     _V.copy_(*args.begin());
     _conc_to_dens(_V, _D);
+    return _D;
   } else if (ab == "VT->cp") {
     _V.resize_as_(*args.begin());
     _V.copy_(*args.begin());
     _T.resize_as_(*(args.begin() + 1));
     _T.copy_(*(args.begin() + 1));
-    _cp_mean(_V, _T, _cp);
+    _cp_vol(_V, _T, _cp);
+    return _cp;
   } else if (ab == "VT->H") {
     _V.resize_as_(*args.begin());
     _V.copy_(*args.begin());
     _T.resize_as_(*(args.begin() + 1));
     _T.copy_(*(args.begin() + 1));
     _temp_to_enthalpy(_V, _T, _H);
+    return _H;
   } else if (ab == "TPX->V") {
     _T.resize_as_(*args.begin());
     _T.copy_(*args.begin());
@@ -124,9 +142,18 @@ torch::Tensor ThermoXImpl::compute(
     _X.resize_as_(*(args.begin() + 2));
     _X.copy_(*(args.begin() + 2));
     _xfrac_to_conc(_T, _P, _X, _V);
-  } else if (ab == "TPX->D") {
-    out =
-        _temp_to_dens(*args.begin(), *(args.begin() + 1), *(args.begin() + 2));
+    return _V;
+  } else if (ab == "TPV->S") {
+    // TODO(cli)
+  } else if (ab == "THS->G") {
+    _T.resize_as_(*args.begin());
+    _T.copy_(*args.begin());
+    _U.resize_as_(*(args.begin() + 1));
+    _U.copy_(*(args.begin() + 1));
+    _S.resize_as_(*(args.begin() + 2));
+    _S.copy_(*(args.begin() + 2));
+    _G = _H - _T * _S;
+    return _G;
   } else {
     TORCH_CHECK(false, "Unknown abbreviation: ", ab);
   }
@@ -164,43 +191,32 @@ torch::Tensor ThermoXImpl::forward(torch::Tensor temp, torch::Tensor pres,
   return xfrac - xfrac0;
 }
 
-torch::Tensor ThermoXImpl::_temp_to_dens(torch::Tensor temp, torch::Tensor pres,
-                                         torch::Tensor xfrac) const {
-  int nvapor = options.vapor_ids().size();
-  int ncloud = options.cloud_ids().size();
-  int nmass = nvapor + ncloud;
-
-  auto xgas = 1. - xfrac.narrow(-1, 1 + nvapor, ncloud).sum(-1);
-  auto ftv = xgas / (1. + xfrac.narrow(-1, 1, nmass).matmul(mu_ratio_m1));
-  return pres / (temp * ftv * options.Rd());
-}
-
-torch::Tensor ThermoXImpl::_xfrac_to_yfrac(torch::Tensor xfrac) const {
-  int nmass = xfrac.size(-1) - 1;
+void ThermoXImpl::_xfrac_to_yfrac(torch::Tensor xfrac,
+                                  torch::Tensor &out) const {
+  int ny = xfrac.size(-1) - 1;
 
   auto vec = xfrac.sizes().vec();
   for (int i = 0; i < vec.size() - 1; ++i) {
     vec[i + 1] = xfrac.size(i);
   }
-  vec[0] = nmass;
+  vec[0] = ny;
 
-  auto yfrac = torch::empty(vec, xfrac.options());
+  out = check_resize(out, vec, xfrac.options());
 
-  // (..., nmass + 1) -> (nmass, ...)
+  // (..., ny + 1) -> (ny, ...)
   int ndim = xfrac.dim();
   for (int i = 0; i < ndim - 1; ++i) {
     vec[i] = i + 1;
   }
   vec[ndim - 1] = 0;
 
-  yfrac.permute(vec) = xfrac.narrow(-1, 1, nmass) * (mu_ratio_m1 + 1.);
-  auto sum = 1. + xfrac.narrow(-1, 1, nmass).matmul(mu_ratio_m1);
-  return yfrac / sum.unsqueeze(0);
+  out.permute(vec) = xfrac.narrow(-1, 1, ny) * mu;
+  out /= (xfrac * mu).sum(-1).unsqueeze(0);
 }
 
-torch::Tensor ThermoXImpl::_xfrac_to_conc(torch::Tensor temp,
-                                          torch::Tensor pres,
-                                          torch::Tensor xfrac) const {
+void ThermoXImpl::_xfrac_to_conc(torch::Tensor temp, torch::Tensor pres,
+                                 torch::Tensor xfrac,
+                                 torch::Tensor &out) const {
   auto nvapor = options.vapor_ids().size();
   auto ncloud = options.cloud_ids().size();
 
@@ -215,36 +231,6 @@ torch::Tensor ThermoXImpl::_xfrac_to_conc(torch::Tensor temp,
                                         conc.select(-1, 0).unsqueeze(-1);
 
   return conc;
-}
-
-torch::Tensor ThermoXImpl::_temp_to_enthalpy(
-    torch::Tensor temp, torch::Tensor conc,
-    torch::optional<torch::Tensor> out) const {
-  int ngas = 1 + options.vapor_ids().size();
-  auto intEng = eval_intEng_R(temp, conc, options) * constants::Rgas;
-  auto zRT = eval_czh(temp, conc, options).narrow(-1, 0, ngas) *
-             constants::Rgas * temp.unsqueeze(-1);
-  int ngas = 1 + options.vapor_ids().size();
-
-  if (out.has_value()) {
-    out = (intEng * conc).sum(-1) + zRT * conc.narrow(-1, 0, ngas);
-    return out.value();
-  } else {
-    return (intEng * conc).sum(-1) + zRT * conc.narrow(-1, 0, ngas);
-  }
-}
-
-torch::Tensor ThermoXImpl::_cp_vol(torch::Tensor temp, torch::Tensor conc,
-                                   torch::optional<torch::Tensor> out) const {
-  auto cp1 = eval_cp_R(temp, conc, options) * constants::Rgas;
-  auto ctotal = conc.sum(-1);
-
-  if (out.has_value()) {
-    out = (cp1 * conc).sum(-1) / ctotal;
-    return out.value();
-  } else {
-    return (cp1 * conc).sum(-1) / ctotal;
-  }
 }
 
 }  // namespace kintera
