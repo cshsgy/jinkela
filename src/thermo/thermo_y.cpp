@@ -65,13 +65,19 @@ void ThermoYImpl::reset() {
       "inv_mu",
       1. / (mud * torch::tensor(options.mu_ratio(), torch::kFloat64)));
 
+  // change offset to T = 0
+  for (int i = 0; i < options.uref_R().size(); ++i) {
+    options.uref_R()[i] -= options.cref_R()[i] * options.Tref();
+  }
+
   auto cv_R = torch::tensor(options.cref_R(), torch::kFloat64);
   auto uref_R = torch::tensor(options.uref_R(), torch::kFloat64);
 
-  // J/mol/K -> J/kg/K
+  // J/kg/K
   cv0 = register_buffer("cv0", cv_R * constants::Rgas * inv_mu);
-  u0 = register_buffer(
-      "u0", uref_R * constants::Rgas * inv_mu - cv0 * options.Tref());
+
+  // J/kg
+  u0 = register_buffer("u0", uref_R * constants::Rgas * inv_mu);
 
   // populate stoichiometry matrix
   int nspecies = options.species().size();

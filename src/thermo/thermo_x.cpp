@@ -14,15 +14,15 @@ ThermoXImpl::ThermoXImpl(const ThermoOptions &options_) : options(options_) {
   int ncloud = options.cloud_ids().size();
 
   if (options.mu_ratio().empty()) {
-    options.mu_ratio() = std::vector<double>(nvapor + ncloud, 1.);
+    options.mu_ratio() = std::vector<double>(1 + nvapor + ncloud, 1.);
   }
 
   if (options.cref_R().empty()) {
-    options.cref_R() = std::vector<double>(nvapor + ncloud, 5. / 2.);
+    options.cref_R() = std::vector<double>(1 + nvapor + ncloud, 5. / 2.);
   }
 
   if (options.uref_R().empty()) {
-    options.uref_R() = std::vector<double>(nvapor + ncloud, 0.);
+    options.uref_R() = std::vector<double>(1 + nvapor + ncloud, 0.);
   }
 
   // populate higher-order thermodynamic functions
@@ -42,7 +42,7 @@ ThermoXImpl::ThermoXImpl(const ThermoOptions &options_) : options(options_) {
     options.czh().push_back(nullptr);
   }
 
-  while (options.czh().size() < options.species().size()) {
+  while (options.czh_ddC().size() < options.species().size()) {
     options.czh_ddC().push_back(nullptr);
   }
 
@@ -63,6 +63,11 @@ void ThermoXImpl::reset() {
   auto mud = constants::Rgas / options.Rd();
   mu = register_buffer(
       "mu", mud * torch::tensor(options.mu_ratio(), torch::kFloat64));
+
+  // change offset to T = 0
+  for (int i = 0; i < options.uref_R().size(); ++i) {
+    options.uref_R()[i] -= options.cref_R()[i] * options.Tref();
+  }
 
   // populate stoichiometry matrix
   int nspecies = options.species().size();
