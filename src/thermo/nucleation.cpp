@@ -1,5 +1,5 @@
 // kintera
-#include "thermo_reactions.hpp"
+#include "nucleation.hpp"
 
 namespace kintera {
 

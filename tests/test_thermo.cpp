@@ -8,6 +8,7 @@
 #include <kintera/constants.h>
 
 #include <kintera/eos/equation_of_state.hpp>
+#include <kintera/thermo/eval_uh.hpp>
 #include <kintera/thermo/thermo.hpp>
 #include <kintera/thermo/thermo_formatter.hpp>
 
@@ -16,25 +17,6 @@
 
 using namespace kintera;
 using namespace torch::indexing;
-
-TEST_P(DeviceTest, feps) {
-  auto op_thermo = ThermoOptions::from_yaml("jupiter.yaml");
-
-  ThermoY thermo(op_thermo);
-  thermo->to(device, dtype);
-
-  int ny =
-      thermo->options.vapor_ids().size() + thermo->options.cloud_ids().size();
-  auto yfrac = torch::zeros({ny, 1, 2, 3}, torch::device(device).dtype(dtype));
-
-  for (int i = 0; i < ny; ++i) yfrac[i] = 0.01 * (i + 1);
-
-  auto feps = thermo->f_eps(yfrac);
-  std::cout << "feps = " << feps << std::endl;
-
-  auto fsig = thermo->f_sig(yfrac);
-  std::cout << "fsig = " << fsig << std::endl;
-}
 
 TEST_P(DeviceTest, thermo_y) {
   auto op_thermo = ThermoOptions::from_yaml("jupiter.yaml");
@@ -48,18 +30,42 @@ TEST_P(DeviceTest, thermo_y) {
 
   for (int i = 0; i < ny; ++i) yfrac[i] = 0.01 * (i + 1);
 
+  ////////// Testing Y->X conversion //////////
   auto xfrac = thermo->compute("Y->X", {yfrac});
-  std::cout << "xfrac = " << xfrac << std::endl;
-
   EXPECT_EQ(torch::allclose(
                 xfrac.sum(-1),
                 torch::ones({1, 2, 3}, torch::device(device).dtype(dtype)),
                 /*rtol=*/1e-4, /*atol=*/1e-4),
             true);
 
+  ////////// Testing DY->V conversion //////////
   auto rho = torch::ones({1, 2, 3}, torch::device(device).dtype(dtype));
-  auto conc = thermo->compute("DY->C", {rho, yfrac});
-  std::cout << "conc = " << conc << std::endl;
+  auto ivol = thermo->compute("DY->V", {rho, yfrac});
+  EXPECT_EQ(torch::allclose(rho, ivol.sum(-1),
+                            /*rtol=*/1e-4, /*atol=*/1e-4),
+            true);
+
+  ////////// Testing V->Y conversion //////////
+  auto yfrac2 = thermo->compute("V->Y", {ivol});
+  EXPECT_EQ(torch::allclose(yfrac, yfrac2, /*rtol=*/1e-4, /*atol=*/1e-4), true);
+
+  ////////// Testing VT->P conversion //////////
+  auto temp = 300. * torch::ones({1, 2, 3}, torch::device(device).dtype(dtype));
+  auto pres = thermo->compute("VT->P", {ivol, temp});
+
+  ////////// Testing PV->T conversion //////////
+  auto temp2 = thermo->compute("PV->T", {pres, ivol});
+  EXPECT_EQ(torch::allclose(temp, temp2, /*rtol=*/1e-4, /*atol=*/1e-4), true);
+
+  ////////// Testing VT->cv conversion //////////
+  auto cv = thermo->compute("VT->cv", {ivol, temp});
+
+  ////////// Testing VT->U conversion //////////
+  auto intEng = thermo->compute("VT->U", {ivol, temp});
+
+  ////////// Testing VU->T conversion //////////
+  auto temp3 = thermo->compute("VU->T", {ivol, intEng});
+  EXPECT_EQ(torch::allclose(temp, temp3, /*rtol=*/1e-4, /*atol=*/1e-4), true);
 }
 
 TEST_P(DeviceTest, thermo_x) {
@@ -76,8 +82,25 @@ TEST_P(DeviceTest, thermo_x) {
   for (int i = 0; i < ny; ++i) xfrac.select(-1, i + 1) = 0.01 * (i + 1);
   xfrac.select(-1, 0) = 1. - xfrac.narrow(-1, 1, ny).sum(-1);
 
+  /////////// Testing X->Y conversion //////////
   auto yfrac = thermo->compute("X->Y", {xfrac});
-  std::cout << "yfrac = " << yfrac << std::endl;
+
+  /////////// Testing TDX->V conversion //////////
+  auto temp = 300. * torch::ones({1, 2, 3}, torch::device(device).dtype(dtype));
+  auto pres = 1.e5 * torch::ones({1, 2, 3}, torch::device(device).dtype(dtype));
+  auto conc = thermo->compute("TPX->V", {temp, pres, xfrac});
+
+  //////////// Testing V->D conversion //////////
+  auto rho = thermo->compute("V->D", {conc});
+  EXPECT_EQ(torch::allclose(rho, (conc * thermo->mu).sum(-1),
+                            /*rtol=*/1e-4, /*atol=*/1e-4),
+            true);
+
+  //////////// Testing VT->cp conversion //////////
+  auto cp = thermo->compute("TV->cp", {temp, conc});
+
+  //////////// Testing VT->H conversion //////////
+  auto enthalpy = thermo->compute("TV->H", {temp, conc});
 }
 
 TEST_P(DeviceTest, thermo_xy) {
@@ -111,7 +134,6 @@ TEST_P(DeviceTest, thermo_yx) {
 
   int ny = op_thermo.vapor_ids().size() + op_thermo.cloud_ids().size();
   auto yfrac = torch::zeros({ny, 1, 2, 3}, torch::device(device).dtype(dtype));
-
   for (int i = 0; i < ny; ++i) yfrac[i] = 0.01 * (i + 1);
 
   auto xfrac = thermo_y->compute("Y->X", {yfrac});
@@ -137,14 +159,16 @@ TEST_P(DeviceTest, eng_pres) {
   auto pres = 1.e5 * torch::ones({1}, torch::device(device).dtype(dtype));
 
   auto xfrac = thermo_y->compute("Y->X", {yfrac});
-  auto rho = thermo_x->compute("TPX->D", {temp, pres, xfrac});
+  auto conc = thermo_x->compute("TPX->V", {temp, pres, xfrac});
+  auto rho = thermo_x->compute("V->D", {conc});
 
-  auto intEng = thermo_y->compute("DPY->U", {rho, pres, yfrac});
-  auto pres2 = thermo_y->compute("DUY->P", {rho, intEng, yfrac});
-  EXPECT_EQ(torch::allclose(pres, pres2, /*rtol=*/1e-4, /*atol=*/1e-4), true);
+  auto ivol = thermo_y->compute("DY->V", {rho, yfrac});
+  auto intEng = thermo_y->compute("VT->U", {ivol, temp});
+  auto pres2 = thermo_y->compute("VT->P", {ivol, temp});
+  EXPECT_EQ(torch::allclose(pres, pres2, 1e-4, 1e-4), true);
 
-  auto temp2 = thermo_y->compute("DPY->T", {rho, pres, yfrac});
-  EXPECT_EQ(torch::allclose(temp, temp2, /*rtol=*/1e-4, /*atol=*/1e-4), true);
+  auto temp2 = thermo_y->compute("VU->T", {ivol, intEng});
+  EXPECT_EQ(torch::allclose(temp, temp2, 1e-4, 1e-4), true);
 }
 
 TEST_P(DeviceTest, equilibrate_tp) {
@@ -185,103 +209,32 @@ TEST_P(DeviceTest, equilibrate_uv) {
 
   auto rho = 0.1 * torch::ones({1, 2, 3}, torch::device(device).dtype(dtype));
   auto pres = 1.e5 * torch::ones({1, 2, 3}, torch::device(device).dtype(dtype));
-  auto intEng = thermo_y->compute("DPY->U", {rho, pres, yfrac});
+
+  auto ivol = thermo_y->compute("DY->V", {rho, yfrac});
+  auto temp = thermo_y->compute("PV->T", {pres, ivol});
+  auto intEng = thermo_y->compute("VT->U", {ivol, temp});
+
   std::cout << "intEng = " << intEng << std::endl;
   std::cout << "pres before = " << pres << std::endl;
   std::cout << "yfrac before = " << yfrac.index({Slice(), 0, 0, 0})
             << std::endl;
-  std::cout << "temp before = "
-            << thermo_y->compute("DPY->T", {rho, pres, yfrac}) << std::endl;
+  std::cout << "temp before = " << temp << std::endl;
 
   thermo_y->forward(rho, intEng, yfrac);
+
   std::cout << "yfrac after = " << yfrac.index({Slice(), 0, 0, 0}) << std::endl;
-  auto pres2 = thermo_y->compute("DUY->P", {rho, intEng, yfrac});
+
+  auto ivol2 = thermo_y->named_buffers()["V"];
+  auto temp2 = thermo_y->named_buffers()["T"];
+  auto pres2 = thermo_y->compute("VT->P", {ivol, temp});
+  auto intEng2 = thermo_y->compute("VT->U", {ivol2, temp2});
+
   std::cout << "pres after = " << pres2 << std::endl;
-  auto intEng2 = thermo_y->compute("DPY->U", {rho, pres2, yfrac});
+  std::cout << "temp after = " << temp2 << std::endl;
   std::cout << "intEng after = " << intEng2 << std::endl;
-  std::cout << "temp after = "
-            << thermo_y->compute("DPY->T", {rho, pres2, yfrac}) << std::endl;
 
-  EXPECT_EQ(torch::allclose(intEng, intEng2, /*rtol=*/1e-4, /*atol=*/1e-4),
-            true);
+  EXPECT_EQ(torch::allclose(intEng, intEng2, 1e-4, 1e-4), true);
 }
-
-/*TEST_P(DeviceTest, earth) {
-  auto op_cond = CondensationOptions();
-
-  auto r = Nucleation(
-      "H2O => H2O(l)", "ideal",
-      {{"T3", 273.15}, {"P3", 611.7}, {"beta", 24.8}, {"delta", 0.0}});
-  op_cond.react().push_back(r);
-
-  auto op_thermo = ThermodynamicsOptions().cond(op_cond);
-  int nvapor = 1;
-  int ncloud = 1;
-
-  op_thermo.nvapor(nvapor).ncloud(ncloud).max_iter(200);
-  op_thermo.species().push_back("H2O");
-  op_thermo.species().push_back("H2O(l)");
-
-  auto mu = 18.e-3;
-  auto Rd = 287.;
-  auto gammad = 1.4;
-  auto mud = constants::Rgas / Rd;
-  auto cvd = Rd / (gammad - 1.);
-  auto cpd = cvd + Rd;
-
-  auto cvv = (cvd * mud) / mu;
-  auto cpv = cvv + constants::Rgas / mu;
-  auto cc = 4.18e3;
-
-  std::cout << "mud = " << mud << std::endl;
-  std::cout << "cvd = " << cvd << std::endl;
-  std::cout << "cpd = " << cpd << std::endl;
-
-  op_thermo.Rd(Rd).gammad_ref(gammad);
-  op_thermo.mu_ratio_m1() = std::vector<double>{mud / mu - 1., mud / mu - 1.};
-  op_thermo.cv_ratio_m1() = std::vector<double>{cvv / cvd - 1., cc / cvd - 1.};
-  op_thermo.cp_ratio_m1() = std::vector<double>{cpv / cpd - 1., cc / cpd - 1.};
-  op_thermo.h0() = std::vector<double>{0., 0., -2.5e6};
-
-  Thermodynamics thermo(op_thermo);
-
-  std::cout << "mu_ratio_m1 = " << thermo->mu_ratio_m1 << std::endl;
-  std::cout << "cv_ratio_m1 = " << thermo->cv_ratio_m1 << std::endl;
-  std::cout << "cp_ratio_m1 = " << thermo->cp_ratio_m1 << std::endl;
-  std::cout << "h0 = " << thermo->h0 << std::endl;
-
-  double temp0 = 300.;
-  double pres = 1.e5;
-  double xvapor = 0.1;
-  auto u = torch::zeros({5 + nvapor + ncloud, 1, 1, 2}, torch::kFloat64);
-
-  u[0] = (1. - xvapor) * pres / (constants::Rgas * temp0 / mud);
-
-  int ivapor = thermo->species_index("H2O");
-  int icloud = thermo->species_index("H2O(l)");
-
-  u[ivapor] = xvapor * pres / (constants::Rgas * temp0 / mu);
-  u[index::IPR] = (u[0] * cvd + u[ivapor] * cvv + u[icloud] * cc) * temp0;
-
-  std::cout << "u before = " << u << std::endl;
-
-  auto op_eos = EquationOfStateOptions().thermo(thermo->options);
-  auto eos = IdealMoist(op_eos);
-
-  auto w = eos->forward(u);
-  std::cout << "w before = " << w << std::endl;
-
-  auto du = thermo->forward(u);
-  std::cout << "du = " << du << std::endl;
-  std::cout << "u after = " << u << std::endl;
-
-  auto temp = thermo->get_temp(w);
-  auto dw = thermo->equilibrate_tp(temp, w[index::IPR],
-                                   w.slice(0, index::ICY, w.size(0)));
-  w.slice(0, index::ICY, w.size(0)) += dw;
-  std::cout << "dw = " << dw << std::endl;
-  std::cout << "w after = " << w << std::endl;
-}*/
 
 int main(int argc, char **argv) {
   testing::InitGoogleTest(&argc, argv);
