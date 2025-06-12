@@ -117,68 +117,51 @@ void ThermoYImpl::reset() {
 torch::Tensor const &ThermoYImpl::compute(
     std::string ab, std::initializer_list<torch::Tensor> args) {
   if (ab == "V->Y") {
-    _V.resize_as_(*args.begin());
-    _V.copy_(*args.begin());
+    _V.set_(*args.begin());
     _ivol_to_yfrac(_V, _Y);
     return _Y;
   } else if (ab == "Y->X") {
-    _Y.resize_as_(*args.begin());
-    _Y.copy_(*args.begin());
+    _Y.set_(*args.begin());
     _yfrac_to_xfrac(_Y, _X);
     return _X;
   } else if (ab == "DY->V") {
-    _D.resize_as_(*args.begin());
-    _D.copy_(*args.begin());
-    _Y.resize_as_(*(args.begin() + 1));
-    _Y.copy_(*(args.begin() + 1));
+    _D.set_(*args.begin());
+    _Y.set_(*(args.begin() + 1));
     _yfrac_to_ivol(_D, _Y, _V);
     return _V;
   } else if (ab == "PV->T") {
-    _P.resize_as_(*args.begin());
-    _P.copy_(*args.begin());
-    _V.resize_as_(*(args.begin() + 1));
-    _V.copy_(*(args.begin() + 1));
+    _P.set_(*args.begin());
+    _V.set_(*(args.begin() + 1));
     _pres_to_temp(_P, _V, _T);
     return _T;
   } else if (ab == "VT->cv") {
-    _V.resize_as_(*args.begin());
-    _V.copy_(*args.begin());
-    _T.resize_as_(*(args.begin() + 1));
-    _T.copy_(*(args.begin() + 1));
+    _V.set_(*args.begin());
+    _T.set_(*(args.begin() + 1));
     _cv_vol(_V, _T, _cv);
     return _cv;
   } else if (ab == "VT->U") {
-    _V.resize_as_(*args.begin());
-    _V.copy_(*args.begin());
-    _T.resize_as_(*(args.begin() + 1));
-    _T.copy_(*(args.begin() + 1));
+    _V.set_(*args.begin());
+    _T.set_(*(args.begin() + 1));
     _temp_to_intEng(_V, _T, _U);
     return _U;
   } else if (ab == "VU->T") {
-    _V.resize_as_(*args.begin());
-    _V.copy_(*args.begin());
-    _U.resize_as_(*(args.begin() + 1));
-    _U.copy_(*(args.begin() + 1));
+    _V.set_(*args.begin());
+    _U.set_(*(args.begin() + 1));
     _intEng_to_temp(_V, _U, _T);
     return _T;
   } else if (ab == "VT->P") {
-    _V.resize_as_(*args.begin());
-    _V.copy_(*args.begin());
-    _T.resize_as_(*(args.begin() + 1));
-    _T.copy_(*(args.begin() + 1));
+    _V.set_(*args.begin());
+    _T.set_(*(args.begin() + 1));
     _temp_to_pres(_V, _T, _P);
     return _P;
   } else if (ab == "PVT->S") {
     // TODO(cli)
     return _S;
   } else if (ab == "TUS->F") {
-    _T.resize_as_(*args.begin());
-    _T.copy_(*args.begin());
-    _U.resize_as_(*(args.begin() + 1));
-    _U.copy_(*(args.begin() + 1));
-    _S.resize_as_(*(args.begin() + 2));
-    _S.copy_(*(args.begin() + 2));
-    _F = _U - _T * _S;
+    _T.set_(*args.begin());
+    _U.set_(*(args.begin() + 1));
+    _S.set_(*(args.begin() + 2));
+    _F.set_(_U - _T * _S);
     return _F;
   } else {
     TORCH_CHECK(false, "Unknown abbreviation: ", ab);
@@ -191,11 +174,8 @@ torch::Tensor ThermoYImpl::forward(torch::Tensor rho, torch::Tensor intEng,
   auto ivol = compute("DY->V", {rho, yfrac});
 
   // initial guess
-  auto &temp = _T;
-  auto &pres = _P;
-
-  temp = compute("VU->T", {ivol, intEng});
-  pres = compute("VT->P", {ivol, temp});
+  auto &temp = compute("VU->T", {ivol, intEng});
+  auto pres = compute("VT->P", {ivol, temp});
   auto conc = ivol * inv_mu;
 
   // prepare data
@@ -235,7 +215,6 @@ torch::Tensor ThermoYImpl::forward(torch::Tensor rho, torch::Tensor intEng,
 
   ivol = conc / inv_mu;
   yfrac = compute("V->Y", {ivol});
-  pres = compute("TV->P", {temp, ivol});
   return yfrac - yfrac0;
 }
 
@@ -250,7 +229,7 @@ void ThermoYImpl::_ivol_to_yfrac(torch::Tensor ivol, torch::Tensor &out) const {
   }
   vec[0] = ny;
 
-  out = check_resize(out, vec, ivol.options());
+  out.set_(check_resize(out, vec, ivol.options()));
 
   // (..., ny + 1) -> (ny, ...)
   int ndim = ivol.dim();
@@ -274,7 +253,7 @@ void ThermoYImpl::_yfrac_to_xfrac(torch::Tensor yfrac,
   }
   vec.back() = ny + 1;
 
-  out = check_resize(out, vec, yfrac.options());
+  out.set_(check_resize(out, vec, yfrac.options()));
 
   // (ny, ...) -> (..., ny + 1)
   int ndim = yfrac.dim();
@@ -301,7 +280,7 @@ void ThermoYImpl::_yfrac_to_ivol(torch::Tensor rho, torch::Tensor yfrac,
   vec.erase(vec.begin());
   vec.push_back(1 + ny);
 
-  out = check_resize(out, vec, yfrac.options());
+  out.set_(check_resize(out, vec, yfrac.options()));
 
   // (ny, ...) -> (..., ny + 1)
   int ndim = yfrac.dim();
@@ -321,7 +300,7 @@ void ThermoYImpl::_pres_to_temp(torch::Tensor pres, torch::Tensor ivol,
   // kg/m^3 -> mol/m^3
   auto conc_gas = (ivol * inv_mu).narrow(-1, 0, ngas);
 
-  out = pres / (conc_gas.sum(-1) * constants::Rgas);
+  out.set_(pres / (conc_gas.sum(-1) * constants::Rgas));
   int iter = 0;
   while (iter++ < options.max_iter()) {
     auto cz = eval_czh(out, conc_gas, options);
@@ -345,7 +324,7 @@ void ThermoYImpl::_cv_vol(torch::Tensor ivol, torch::Tensor temp,
   // kg/m^3 -> mol/m^3
   auto conc = ivol * inv_mu;
   auto cv = eval_cv_R(temp, conc, options) * constants::Rgas;
-  out = (cv * conc).sum(-1);
+  out.set_((cv * conc).sum(-1));
 }
 
 void ThermoYImpl::_temp_to_intEng(torch::Tensor ivol, torch::Tensor temp,
@@ -353,7 +332,7 @@ void ThermoYImpl::_temp_to_intEng(torch::Tensor ivol, torch::Tensor temp,
   // kg/m^3 -> mol/m^3
   auto conc = ivol * inv_mu;
   auto u = eval_intEng_R(temp, conc, options) * constants::Rgas;
-  out = (u * conc).sum(-1);
+  out.set_((u * conc).sum(-1));
 }
 
 void ThermoYImpl::_intEng_to_temp(torch::Tensor ivol, torch::Tensor intEng,
@@ -363,7 +342,7 @@ void ThermoYImpl::_intEng_to_temp(torch::Tensor ivol, torch::Tensor intEng,
   auto cv0_sum = (ivol * cv0).sum(-1);
   auto conc = ivol * inv_mu;
 
-  out = (intEng - u0_sum) / cv0_sum;
+  out.set_((intEng - u0_sum) / cv0_sum);
   int iter = 0;
   while (iter++ < options.max_iter()) {
     auto u = eval_intEng_R(out, conc, options) * constants::Rgas;
@@ -387,7 +366,7 @@ void ThermoYImpl::_temp_to_pres(torch::Tensor ivol, torch::Tensor temp,
   // kg/m^3 -> mol/m^3
   auto conc_gas = (ivol * inv_mu).narrow(-1, 0, ngas);
   auto cz = eval_czh(temp, conc_gas, options);
-  out = constants::Rgas * temp * (cz * conc_gas).sum(-1);
+  out.set_(constants::Rgas * temp * (cz * conc_gas).sum(-1));
 }
 
 }  // namespace kintera

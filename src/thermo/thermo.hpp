@@ -251,7 +251,7 @@ class ThermoXImpl : public torch::nn::Cloneable<ThermoXImpl> {
    * \param[out] out total density, kg/m^3, (...)
    */
   void _conc_to_dens(torch::Tensor conc, torch::Tensor& out) const {
-    out = (conc * mu).sum(-1);
+    out.set_((conc * mu).sum(-1));
   }
 
   //! \brief calculatec volumetric heat capacity
@@ -263,7 +263,7 @@ class ThermoXImpl : public torch::nn::Cloneable<ThermoXImpl> {
   void _cp_vol(torch::Tensor temp, torch::Tensor conc,
                torch::Tensor& out) const {
     auto cp = eval_cp_R(temp, conc, options) * constants::Rgas;
-    out = (conc * cp).sum(-1);
+    out.set_((conc * cp).sum(-1));
   }
 
   //! \brief calculate enthalpy
@@ -275,7 +275,7 @@ class ThermoXImpl : public torch::nn::Cloneable<ThermoXImpl> {
   void _temp_to_enthalpy(torch::Tensor temp, torch::Tensor conc,
                          torch::Tensor& out) const {
     auto hi = eval_enthalpy_R(temp, conc, options) * constants::Rgas;
-    out = (conc * hi).sum(-1);
+    out.set_((conc * hi).sum(-1));
   }
 
   //! \brief Calculate concentration from mole fraction

@@ -82,8 +82,25 @@ TEST_P(DeviceTest, thermo_x) {
   for (int i = 0; i < ny; ++i) xfrac.select(-1, i + 1) = 0.01 * (i + 1);
   xfrac.select(-1, 0) = 1. - xfrac.narrow(-1, 1, ny).sum(-1);
 
+  /////////// Testing X->Y conversion //////////
   auto yfrac = thermo->compute("X->Y", {xfrac});
-  std::cout << "yfrac = " << yfrac << std::endl;
+
+  /////////// Testing TDX->V conversion //////////
+  auto temp = 300. * torch::ones({1, 2, 3}, torch::device(device).dtype(dtype));
+  auto pres = 1.e5 * torch::ones({1, 2, 3}, torch::device(device).dtype(dtype));
+  auto conc = thermo->compute("TPX->V", {temp, pres, xfrac});
+
+  //////////// Testing V->D conversion //////////
+  auto rho = thermo->compute("V->D", {conc});
+  EXPECT_EQ(torch::allclose(rho, (conc * thermo->mu).sum(-1),
+                            /*rtol=*/1e-4, /*atol=*/1e-4),
+            true);
+
+  //////////// Testing VT->cp conversion //////////
+  auto cp = thermo->compute("TV->cp", {temp, conc});
+
+  //////////// Testing VT->H conversion //////////
+  auto enthalpy = thermo->compute("TV->H", {temp, conc});
 }
 
 TEST_P(DeviceTest, thermo_xy) {
@@ -125,27 +142,7 @@ TEST_P(DeviceTest, thermo_yx) {
   EXPECT_EQ(torch::allclose(yfrac, yfrac2, /*rtol=*/1e-4, /*atol=*/1e-4), true);
 }
 
-TEST_P(DeviceTest, evals) {
-  auto op_thermo = ThermoOptions::from_yaml("jupiter.yaml");
-
-  ThermoY thermo(op_thermo);
-  thermo->to(device, dtype);
-
-  int ny = op_thermo.vapor_ids().size() + op_thermo.cloud_ids().size();
-  auto yfrac = torch::zeros({ny, 1, 2, 3}, torch::device(device).dtype(dtype));
-  for (int i = 0; i < ny; ++i) yfrac[i] = 0.01 * (i + 1);
-
-  auto rho = torch::ones({1, 2, 3}, torch::device(device).dtype(dtype));
-  auto conc = thermo->compute("DY->C", {rho, yfrac});
-  auto temp = 300. * torch::ones({1, 2, 3}, torch::device(device).dtype(dtype));
-
-  auto cv_R = eval_cv_R(temp, conc, thermo->options);
-  std::cout << "cv_R = " << cv_R << std::endl;
-
-  throw std::runtime_error("Test not implemented yet");
-}
-
-/*TEST_P(DeviceTest, eng_pres) {
+TEST_P(DeviceTest, eng_pres) {
   auto op_thermo = ThermoOptions::from_yaml("jupiter.yaml");
   ThermoY thermo_y(op_thermo);
   thermo_y->to(device, dtype);
@@ -162,13 +159,15 @@ TEST_P(DeviceTest, evals) {
   auto pres = 1.e5 * torch::ones({1}, torch::device(device).dtype(dtype));
 
   auto xfrac = thermo_y->compute("Y->X", {yfrac});
-  auto rho = thermo_x->compute("TPX->D", {temp, pres, xfrac});
+  auto conc = thermo_x->compute("TPX->V", {temp, pres, xfrac});
+  auto rho = thermo_x->compute("V->D", {conc});
 
-  auto intEng = thermo_y->compute("DPY->U", {rho, pres, yfrac});
-  auto pres2 = thermo_y->compute("DUY->P", {rho, intEng, yfrac});
+  auto ivol = thermo_y->compute("DY->V", {rho, yfrac});
+  auto intEng = thermo_y->compute("VT->U", {ivol, temp});
+  auto pres2 = thermo_y->compute("VT->P", {ivol, temp});
   EXPECT_EQ(torch::allclose(pres, pres2, 1e-4, 1e-4), true);
 
-  auto temp2 = thermo_y->compute("DPY->T", {rho, pres, yfrac});
+  auto temp2 = thermo_y->compute("VU->T", {ivol, intEng});
   EXPECT_EQ(torch::allclose(temp, temp2, 1e-4, 1e-4), true);
 }
 
@@ -210,25 +209,32 @@ TEST_P(DeviceTest, equilibrate_uv) {
 
   auto rho = 0.1 * torch::ones({1, 2, 3}, torch::device(device).dtype(dtype));
   auto pres = 1.e5 * torch::ones({1, 2, 3}, torch::device(device).dtype(dtype));
-  auto intEng = thermo_y->compute("DPY->U", {rho, pres, yfrac});
+
+  auto ivol = thermo_y->compute("DY->V", {rho, yfrac});
+  auto temp = thermo_y->compute("PV->T", {pres, ivol});
+  auto intEng = thermo_y->compute("VT->U", {ivol, temp});
+
   std::cout << "intEng = " << intEng << std::endl;
   std::cout << "pres before = " << pres << std::endl;
   std::cout << "yfrac before = " << yfrac.index({Slice(), 0, 0, 0})
             << std::endl;
-  std::cout << "temp before = "
-            << thermo_y->compute("DPY->T", {rho, pres, yfrac}) << std::endl;
+  std::cout << "temp before = " << temp << std::endl;
 
   thermo_y->forward(rho, intEng, yfrac);
+
   std::cout << "yfrac after = " << yfrac.index({Slice(), 0, 0, 0}) << std::endl;
-  auto pres2 = thermo_y->compute("DUY->P", {rho, intEng, yfrac});
+
+  auto ivol2 = thermo_y->named_buffers()["V"];
+  auto temp2 = thermo_y->named_buffers()["T"];
+  auto pres2 = thermo_y->compute("VT->P", {ivol, temp});
+  auto intEng2 = thermo_y->compute("VT->U", {ivol2, temp2});
+
   std::cout << "pres after = " << pres2 << std::endl;
-  auto intEng2 = thermo_y->compute("DPY->U", {rho, pres2, yfrac});
+  std::cout << "temp after = " << temp2 << std::endl;
   std::cout << "intEng after = " << intEng2 << std::endl;
-  std::cout << "temp after = "
-            << thermo_y->compute("DPY->T", {rho, pres2, yfrac}) << std::endl;
 
   EXPECT_EQ(torch::allclose(intEng, intEng2, 1e-4, 1e-4), true);
-}*/
+}
 
 int main(int argc, char **argv) {
   testing::InitGoogleTest(&argc, argv);

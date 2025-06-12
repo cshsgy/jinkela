@@ -133,8 +133,9 @@ torch::Tensor eval_enthalpy_R(torch::Tensor temp, torch::Tensor conc,
   auto enthalpy_R = torch::zeros_like(conc);
   auto czh = eval_czh(temp, conc, op);
 
-  enthalpy_R.narrow(-1, 0, ngas) = eval_intEng_R(temp, conc, op) +
-                                   czh.narrow(-1, 0, ngas) * temp.unsqueeze(-1);
+  enthalpy_R.narrow(-1, 0, ngas) =
+      eval_intEng_R(temp, conc, op).narrow(-1, 0, ngas) +
+      czh.narrow(-1, 0, ngas) * temp.unsqueeze(-1);
 
   auto cref_R = torch::tensor(op.cref_R(), temp.options());
   auto uref_R = torch::tensor(op.uref_R(), temp.options());

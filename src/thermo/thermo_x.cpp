@@ -107,49 +107,37 @@ void ThermoXImpl::reset() {
 torch::Tensor const &ThermoXImpl::compute(
     std::string ab, std::initializer_list<torch::Tensor> args) {
   if (ab == "X->Y") {
-    _X.resize_as_(*args.begin());
-    _X.copy_(*args.begin());
+    _X.set_(*args.begin());
     _xfrac_to_yfrac(_X, _Y);
     return _Y;
   } else if (ab == "V->D") {
-    _V.resize_as_(*args.begin());
-    _V.copy_(*args.begin());
+    _V.set_(*args.begin());
     _conc_to_dens(_V, _D);
     return _D;
-  } else if (ab == "VT->cp") {
-    _V.resize_as_(*args.begin());
-    _V.copy_(*args.begin());
-    _T.resize_as_(*(args.begin() + 1));
-    _T.copy_(*(args.begin() + 1));
-    _cp_vol(_V, _T, _cp);
+  } else if (ab == "TV->cp") {
+    _T.set_(*args.begin());
+    _V.set_(*(args.begin() + 1));
+    _cp_vol(_T, _V, _cp);
     return _cp;
-  } else if (ab == "VT->H") {
-    _V.resize_as_(*args.begin());
-    _V.copy_(*args.begin());
-    _T.resize_as_(*(args.begin() + 1));
-    _T.copy_(*(args.begin() + 1));
-    _temp_to_enthalpy(_V, _T, _H);
+  } else if (ab == "TV->H") {
+    _T.set_(*args.begin());
+    _V.set_(*(args.begin() + 1));
+    _temp_to_enthalpy(_T, _V, _H);
     return _H;
   } else if (ab == "TPX->V") {
-    _T.resize_as_(*args.begin());
-    _T.copy_(*args.begin());
-    _P.resize_as_(*(args.begin() + 1));
-    _P.copy_(*(args.begin() + 1));
-    _X.resize_as_(*(args.begin() + 2));
-    _X.copy_(*(args.begin() + 2));
+    _T.set_(*args.begin());
+    _P.set_(*(args.begin() + 1));
+    _X.set_(*(args.begin() + 2));
     _xfrac_to_conc(_T, _P, _X, _V);
     return _V;
   } else if (ab == "TPV->S") {
     // TODO(cli)
     return _S;
   } else if (ab == "THS->G") {
-    _T.resize_as_(*args.begin());
-    _T.copy_(*args.begin());
-    _H.resize_as_(*(args.begin() + 1));
-    _H.copy_(*(args.begin() + 1));
-    _S.resize_as_(*(args.begin() + 2));
-    _S.copy_(*(args.begin() + 2));
-    _G = _H - _T * _S;
+    _T.set_(*args.begin());
+    _H.set_(*(args.begin() + 1));
+    _S.set_(*(args.begin() + 2));
+    _G.set_(_H - _T * _S);
     return _G;
   } else {
     TORCH_CHECK(false, "Unknown abbreviation: ", ab);
@@ -198,7 +186,7 @@ void ThermoXImpl::_xfrac_to_yfrac(torch::Tensor xfrac,
   }
   vec[0] = ny;
 
-  out = check_resize(out, vec, xfrac.options());
+  out.set_(check_resize(out, vec, xfrac.options()));
 
   // (..., ny + 1) -> (ny, ...)
   int ndim = xfrac.dim();
@@ -207,7 +195,7 @@ void ThermoXImpl::_xfrac_to_yfrac(torch::Tensor xfrac,
   }
   vec[ndim - 1] = 0;
 
-  out.permute(vec) = xfrac.narrow(-1, 1, ny) * mu;
+  out.permute(vec) = xfrac.narrow(-1, 1, ny) * mu.narrow(0, 1, ny);
   out /= (xfrac * mu).sum(-1).unsqueeze(0);
 }
 
@@ -217,8 +205,8 @@ void ThermoXImpl::_xfrac_to_conc(torch::Tensor temp, torch::Tensor pres,
   int ngas = 1 + options.vapor_ids().size();
   int ncloud = options.cloud_ids().size();
 
-  auto xgas = xfrac.narrow(-1, 0, ngas).sum(-1);
-  auto ideal_gas_conc = xfrac.narrow(-1, 0, ngas) * pres /
+  auto xgas = xfrac.narrow(-1, 0, ngas).sum(-1, /*keepdim=*/true);
+  auto ideal_gas_conc = xfrac.narrow(-1, 0, ngas) * pres.unsqueeze(-1) /
                         (temp.unsqueeze(-1) * constants::Rgas * xgas);
 
   auto conc_gas = ideal_gas_conc.clone();
@@ -237,6 +225,8 @@ void ThermoXImpl::_xfrac_to_conc(torch::Tensor temp, torch::Tensor pres,
   if (iter >= options.max_iter()) {
     TORCH_WARN("ThermoX:_xfrac_to_conc: max iteration reached");
   }
+
+  out.set_(check_resize(out, xfrac.sizes(), xfrac.options()));
 
   out.narrow(-1, 0, ngas) = conc_gas;
   out.narrow(-1, ngas, ncloud) = conc_gas.select(-1, 0).unsqueeze(-1) *
