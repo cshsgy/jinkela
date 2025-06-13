@@ -8,7 +8,7 @@
 #include <kintera/constants.h>
 
 #include <kintera/eos/equation_of_state.hpp>
-#include <kintera/thermo/eval_uh.hpp>
+#include <kintera/thermo/eval_uhs.hpp>
 #include <kintera/thermo/thermo.hpp>
 #include <kintera/thermo/thermo_formatter.hpp>
 
@@ -66,6 +66,10 @@ TEST_P(DeviceTest, thermo_y) {
   ////////// Testing VU->T conversion //////////
   auto temp3 = thermo->compute("VU->T", {ivol, intEng});
   EXPECT_EQ(torch::allclose(temp, temp3, /*rtol=*/1e-4, /*atol=*/1e-4), true);
+
+  ////////// Testing PVT->S conversion //////////
+  auto entropy = thermo->compute("PVT->S", {pres, ivol, temp});
+  // std::cout << "entropy = " << entropy << std::endl;
 }
 
 TEST_P(DeviceTest, thermo_x) {
@@ -101,6 +105,15 @@ TEST_P(DeviceTest, thermo_x) {
 
   //////////// Testing VT->H conversion //////////
   auto enthalpy = thermo->compute("TV->H", {temp, conc});
+
+  //////////// Testing TPV->S conversion //////////
+  auto entropy = thermo->compute("TPV->S", {temp, pres, conc});
+
+  //////////// Testing PVS->T conversion //////////
+  thermo->forward(temp, pres, xfrac);
+  auto entropy2 = thermo->compute("TPV->S", {temp, pres, conc});
+  auto temp2 = thermo->compute("PXS->T", {pres, xfrac, entropy2});
+  EXPECT_EQ(torch::allclose(temp, temp2, /*rtol=*/1e-4, /*atol=*/1e-4), true);
 }
 
 TEST_P(DeviceTest, thermo_xy) {
