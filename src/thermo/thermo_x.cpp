@@ -69,9 +69,15 @@ void ThermoXImpl::reset() {
   mu = register_buffer(
       "mu", mud * torch::tensor(options.mu_ratio(), torch::kFloat64));
 
-  // change offset to T = 0
+  // change internal energy offset to T = 0
   for (int i = 0; i < options.uref_R().size(); ++i) {
     options.uref_R()[i] -= options.cref_R()[i] * options.Tref();
+  }
+
+  // change entropy offset to T = 0
+  for (int i = 0; i < 1 + options.vapor_ids().size(); ++i) {
+    options.sref_R()[i] -=
+        (options.cref_R()[i] + 1) * log(options.Tref()) - log(options.Pref());
   }
 
   // populate stoichiometry matrix
@@ -160,6 +166,11 @@ torch::Tensor const &ThermoXImpl::compute(
 torch::Tensor ThermoXImpl::forward(torch::Tensor temp, torch::Tensor pres,
                                    torch::Tensor &xfrac) {
   auto xfrac0 = xfrac.clone();
+  auto vec = xfrac.sizes().vec();
+
+  // |reactions| x |reactions| weight matrix
+  vec[xfrac.dim() - 1] = options.react().size() * options.react().size();
+  auto umat = torch::empty(vec, xfrac.options());
 
   // prepare data
   auto iter = at::TensorIteratorConfig()
@@ -167,6 +178,7 @@ torch::Tensor ThermoXImpl::forward(torch::Tensor temp, torch::Tensor pres,
                   .check_all_same_dtype(false)
                   .declare_static_shape(xfrac.sizes(),
                                         /*squash_dims=*/{xfrac.dim() - 1})
+                  .add_output(umat)
                   .add_output(xfrac)
                   .add_owned_input(temp.unsqueeze(-1))
                   .add_owned_input(pres.unsqueeze(-1))
@@ -186,7 +198,9 @@ torch::Tensor ThermoXImpl::forward(torch::Tensor temp, torch::Tensor pres,
 
   delete[] logsvp_func;
 
-  return xfrac - xfrac0;
+  vec[xfrac.dim() - 1] /= options.react().size();
+  vec.push_back(options.react().size());
+  return umat.view(vec);
 }
 
 void ThermoXImpl::_xfrac_to_yfrac(torch::Tensor xfrac,
