@@ -35,6 +35,9 @@ torch::Tensor effective_cp_mole(torch::Tensor temp, torch::Tensor pres,
   at::native::call_func1(logsvp_ddT.device().type(), iter, logsvp_func_ddT);
   delete[] logsvp_func_ddT;
 
+  // auto gain_diag = (gain.diagonal(0, -2, -1) != 0).to(gain.dtype());
+  // logsvp_ddT *= gain_diag;
+
   auto rate_ddT = std::get<0>(torch::linalg_lstsq(gain, logsvp_ddT));
 
   if (!conc.has_value()) {
