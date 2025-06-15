@@ -105,12 +105,19 @@ int equilibrate_tp(T *gain, T *diag, T *xfrac, T temp, T pres, T const *stoich,
   int iter = 0;
   int kkt_err = 0;
   int nactive = 0;
+  T lambda = 0.;  // rate scale factor
   while (iter++ < *max_iter) {
+    /*printf("iter = %d\n ", iter);
+    // print xfrac
+    printf("xfrac = ");
+    for (int i = 0; i < nspecies; i++) {
+      printf("%g ", xfrac[i]);
+    }
+    printf("\n");*/
+
     // fraction of gases
     T xg = 0.0;
-    for (int i = 0; i < ngas; i++) {
-      xg += xfrac[i];
-    }
+    for (int i = 0; i < ngas; i++) xg += xfrac[i];
 
     // populate weight matrix, rhs vector and active set
     int first = 0;
@@ -135,14 +142,13 @@ int equilibrate_tp(T *gain, T *diag, T *xfrac, T temp, T pres, T const *stoich,
         for (int i = 0; i < ngas; i++) {
           weight[first * nspecies + i] = -stoich_sum[j] / xg;
           if (stoich[i * nreaction + j] < 0) {
-            weight[first * nspecies + i] +=
-                (-stoich[i * nreaction + j]) / xfrac[i];
+            weight[first * nspecies + i] -=
+                stoich[i * nreaction + j] / xfrac[i];
           }
         }
-
-        for (int i = ngas; i < nspecies; i++)
+        for (int i = ngas; i < nspecies; i++) {
           weight[first * nspecies + i] = 0.0;
-
+        }
         rhs[first] = logsvp[j] - log_frac_sum;
         first++;
       } else {
@@ -158,7 +164,7 @@ int equilibrate_tp(T *gain, T *diag, T *xfrac, T temp, T pres, T const *stoich,
       break;
     }
 
-    // form active stoichiometric and constraint matrix
+    // populate active stoichiometric and constraint matrix
     nactive = first;
     for (int i = 0; i < nspecies; i++)
       for (int k = 0; k < nactive; k++) {
@@ -172,6 +178,7 @@ int equilibrate_tp(T *gain, T *diag, T *xfrac, T temp, T pres, T const *stoich,
       for (int k = 0; k < nactive; k++) {
         stoich_active[i * nactive + k] *= -1;
       }
+    // note that stoich_active is negated
 
     // solve constrained optimization problem (KKT)
     int max_kkt_iter = *max_iter;
@@ -179,35 +186,95 @@ int equilibrate_tp(T *gain, T *diag, T *xfrac, T temp, T pres, T const *stoich,
                           nspecies, 0, &max_kkt_iter);
     if (kkt_err != 0) break;
 
+    /* print rate
+    printf("rate = ");
+    for (int k = 0; k < nactive; k++) {
+      printf("%f ", rhs[k]);
+    }
+    printf("\n");*/
+
     // rate -> xfrac
     // copy xfrac to xfrac0
     memcpy(xfrac0, xfrac, nspecies * sizeof(T));
     T lambda = 1.;  // scale
-
+    T xsum;
     while (true) {
       bool positive_vapor = true;
+      xsum = 0.;
       for (int i = 0; i < nspecies; i++) {
         for (int k = 0; k < nactive; k++) {
-          int j = reaction_set[k];
-          xfrac[i] = xfrac0[i] + stoich[i * nactive + j] * rhs[k] * lambda;
+          xfrac[i] -= stoich_active[i * nactive + k] * rhs[k] * lambda;
         }
         if (i < ngas && xfrac[i] <= 0.) positive_vapor = false;
+        xsum += xfrac[i];
       }
       if (positive_vapor) break;
       lambda *= 0.99;
+      memcpy(xfrac, xfrac0, nspecies * sizeof(T));
+    }
+
+    // re-normalize mole fractions
+    for (int i = 0; i < nspecies; i++) xfrac[i] /= xsum;
+  }
+
+  /////////// Construct a gain matrix of active reactions ///////////
+  int first = 0;
+  int last = nreaction;
+  T xg = 0.0;
+  for (int i = 0; i < ngas; i++) xg += xfrac[i];
+
+  while (first < last) {
+    int j = reaction_set[first];
+    T log_frac_sum = 0.0;
+    T prod = 1.0;
+
+    // active set condition variables
+    for (int i = 0; i < nspecies; i++) {
+      if (stoich[i * nreaction + j] < 0) {  // reactant
+        log_frac_sum += (-stoich[i * nreaction + j]) * log(xfrac[i] / xg);
+      } else if (stoich[i * nreaction + j] > 0) {  // product
+        prod *= xfrac[i];
+      }
+    }
+
+    // active set and weight matrix
+    if ((log_frac_sum >= (logsvp[j] - logsvp_eps) &&
+         (log_frac_sum <= (logsvp[j] + logsvp_eps)))) {
+      for (int i = 0; i < ngas; i++) {
+        weight[first * nspecies + i] = -stoich_sum[j] / xg;
+        if (stoich[i * nreaction + j] < 0) {
+          weight[first * nspecies + i] -= stoich[i * nreaction + j] / xfrac[i];
+        }
+      }
+      for (int i = ngas; i < nspecies; i++) {
+        weight[first * nspecies + i] = 0.0;
+      }
+      first++;
+    } else {
+      int tmp = reaction_set[first];
+      reaction_set[first] = reaction_set[last - 1];
+      reaction_set[last - 1] = tmp;
+      last--;
     }
   }
 
-  // restore the reaction order of gain
+  // populate active stoichiometric and constraint matrix
+  nactive = first;
+  for (int i = 0; i < nspecies; i++)
+    for (int k = 0; k < nactive; k++) {
+      int j = reaction_set[k];
+      stoich_active[i * nactive + k] = stoich[i * nreaction + j];
+    }
+
   T *gain_cpy = (T *)malloc(nreaction * nreaction * sizeof(T));
-  memcpy(gain_cpy, gain, nreaction * nreaction * sizeof(T));
+  mmdot(gain_cpy, weight, stoich_active, nactive, nspecies, nactive);
   memset(gain, 0, nreaction * nreaction * sizeof(T));
 
-  for (int i = 0; i < nactive; i++) {
-    for (int j = 0; j < nactive; j++) {
-      int k = reaction_set[i];
-      int l = reaction_set[j];
-      gain[k * nreaction + l] = gain_cpy[i * nreaction + j];
+  for (int k = 0; k < nactive; k++) {
+    for (int l = 0; l < nactive; l++) {
+      int i = reaction_set[k];
+      int j = reaction_set[l];
+      gain[i * nreaction + j] = gain_cpy[k * nreaction + l];
     }
   }
 
@@ -226,7 +293,7 @@ int equilibrate_tp(T *gain, T *diag, T *xfrac, T temp, T pres, T const *stoich,
   if (iter >= *max_iter) {
     fprintf(stderr, "equilibrate_tp did not converge after %d iterations.\n",
             *max_iter);
-    return 2;  // failure to converge
+    return 2 * 10 + kkt_err;  // failure to converge
   } else {
     *max_iter = iter;
     return kkt_err;  // success or KKT error
