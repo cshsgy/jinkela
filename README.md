@@ -4,7 +4,7 @@ THIS FILE IS GENERATED FROM THE TEMPLATE AND WILL BE OVERWRITTEN
 -->
 
 
-# KINTERA
+# JINKELA: Joint INtegrated Kinetics for Exoplanetary and pLanetary Atmospheres
 
 ### Automatic fetched dependencies
 During the build process, the following dependencies will be fetched and cached automatically:
