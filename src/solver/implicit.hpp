@@ -21,6 +21,9 @@ public:
         const torch::Tensor& Temp,
         double dt,
         ReactionSystem& reaction_system) override;
+
+private:
+    void explicit_step(torch::Tensor& C, torch::Tensor& rates, torch::Tensor& stoich_matrix);
 };
 
 } // namespace kintera 

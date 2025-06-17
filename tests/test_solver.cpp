@@ -18,7 +18,7 @@
 #include <kintera/utils/parse_yaml.hpp>
 #include <kintera/utils/stoichiometry.hpp>
 
-void run_solver_test(const std::string& solver_type, 
+torch::Tensor run_solver_test(const std::string& solver_type, 
                     kintera::ReactionSystem& reaction_system,
                     torch::Tensor& C,
                     const torch::Tensor& P,
@@ -42,6 +42,7 @@ void run_solver_test(const std::string& solver_type,
             std::cout << "Step " << step + 1 << " concentrations:\n" << C << "\n\n";
         }
     }
+    return C;
 }
 
 int main(int argc, char* argv[]) {
@@ -97,12 +98,19 @@ int main(int argc, char* argv[]) {
 
         // Run explicit solver test
         auto C_explicit = C.clone();
-        run_solver_test("explicit", reaction_system, C_explicit, P, Temp, dt, n_steps);
+        C_explicit = run_solver_test("explicit", reaction_system, C_explicit, P, Temp, dt, n_steps);
+        std::cout << "Explicit solver test completed\n\n";
 
         // Run implicit solver test
         auto C_implicit = C.clone();
-        run_solver_test("implicit", reaction_system, C_implicit, P, Temp, dt, n_steps);
+        C_implicit = run_solver_test("implicit", reaction_system, C_implicit, P, Temp, dt, n_steps);
+        std::cout << "Implicit solver test completed\n\n";
 
+        // Compare results
+        std::cout << "Comparing results...\n";
+        std::cout << "Explicit solver results:\n" << C_explicit << "\n\n";
+        std::cout << "Implicit solver results:\n" << C_implicit << "\n\n";
+        
         return 0;
 
     } catch (const std::exception& e) {
