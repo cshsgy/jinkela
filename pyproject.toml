@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kintera"
-version = "0.3.6"
+version = "0.4.0"
 description = "Atmospheric Chemistry and Thermodynamics Library"
 authors = [
   { name="Sihe Chen", email="sihechen@caltech.edu"},
