@@ -10,7 +10,7 @@
 namespace kintera {
 
 torch::Tensor eval_cv_R(torch::Tensor temp, torch::Tensor conc,
-                        ThermoOptions const& op) {
+                        SpeciesThermo const& op) {
   auto cv_R_extra = torch::zeros_like(conc);
 
   // bundle iterator
@@ -34,7 +34,7 @@ torch::Tensor eval_cv_R(torch::Tensor temp, torch::Tensor conc,
 }
 
 torch::Tensor eval_cp_R(torch::Tensor temp, torch::Tensor conc,
-                        ThermoOptions const& op) {
+                        SpeciesThermo const& op) {
   auto cp_R_extra = torch::zeros_like(conc);
 
   // bundle iterator
@@ -54,14 +54,14 @@ torch::Tensor eval_cp_R(torch::Tensor temp, torch::Tensor conc,
 
   auto cref_R =
       torch::tensor(op.cref_R(), temp.options()).narrow(0, 0, conc.size(-1));
-  cref_R.narrow(-1, 0, 1 + op.vapor_ids().size()) += 1;
+  cref_R.narrow(-1, 0, op.vapor_ids().size()) += 1;
   return cp_R_extra + cref_R;
 }
 
 torch::Tensor eval_czh(torch::Tensor temp, torch::Tensor conc,
-                       ThermoOptions const& op) {
+                       SpeciesThermo const& op) {
   auto cz = torch::zeros_like(conc);
-  cz.narrow(-1, 0, 1 + op.vapor_ids().size()) = 1.;
+  cz.narrow(-1, 0, op.vapor_ids().size()) = 1.;
 
   // bundle iterator
   auto iter = at::TensorIteratorConfig()
@@ -81,7 +81,7 @@ torch::Tensor eval_czh(torch::Tensor temp, torch::Tensor conc,
 }
 
 torch::Tensor eval_czh_ddC(torch::Tensor temp, torch::Tensor conc,
-                           ThermoOptions const& op) {
+                           SpeciesThermo const& op) {
   auto cz_ddC = torch::zeros_like(conc);
 
   // bundle iterator
@@ -102,7 +102,7 @@ torch::Tensor eval_czh_ddC(torch::Tensor temp, torch::Tensor conc,
 }
 
 torch::Tensor eval_intEng_R(torch::Tensor temp, torch::Tensor conc,
-                            ThermoOptions const& op) {
+                            SpeciesThermo const& op) {
   auto intEng_R_extra = torch::zeros_like(conc);
 
   // bundle iterator
@@ -128,8 +128,8 @@ torch::Tensor eval_intEng_R(torch::Tensor temp, torch::Tensor conc,
 
 torch::Tensor eval_entropy_R(torch::Tensor temp, torch::Tensor pres,
                              torch::Tensor conc, torch::Tensor stoich,
-                             ThermoOptions const& op) {
-  int ngas = 1 + op.vapor_ids().size();
+                             SpeciesThermo const& op) {
+  int ngas = op.vapor_ids().size();
   int ncloud = op.cloud_ids().size();
 
   // check dimension consistency
@@ -184,17 +184,71 @@ torch::Tensor eval_entropy_R(torch::Tensor temp, torch::Tensor pres,
 
   // std::cout << "entropy_R = " << entropy_R << std::endl;
 
+  return entropy_R;
+}
+
+torch::Tensor eval_entropy_R(torch::Tensor temp, torch::Tensor pres,
+                             torch::Tensor conc, torch::Tensor stoich,
+                             ThermoOptions const& op) {
+  int ngas = op.vapor_ids().size();
+  int ncloud = op.cloud_ids().size();
+
+  // check dimension consistency
+  TORCH_CHECK(conc.size(-1) == ngas + ncloud,
+              "The last dimension of `conc` must match the number of species "
+              "in the thermodynamic model (ngas + ncloud). "
+              "Expected: ",
+              ngas + ncloud, ", got: ", conc.size(-1));
+
+  TORCH_CHECK(
+      stoich.size(0) == ngas + ncloud,
+      "The first dimension of `stoich` must match the number of species "
+      "in the thermodynamic model (ngas + ncloud). "
+      "Expected: ",
+      ngas + ncloud, ", got: ", stoich.size(0));
+
+  //////////// Evaluate gas entropy ////////////
+  auto conc_gas = conc.narrow(-1, 0, ngas);
+
+  // only evaluate vapors
+  auto entropy_R_extra = torch::zeros_like(conc_gas);
+
+  // bundle iterator
+  auto iter = at::TensorIteratorConfig()
+                  .resize_outputs(false)
+                  .check_all_same_dtype(true)
+                  .declare_static_shape(entropy_R_extra.sizes(),
+                                        /*squash_dim=*/{conc.dim() - 1})
+                  .add_output(entropy_R_extra)
+                  .add_owned_input(temp.unsqueeze(-1))
+                  .add_owned_input(pres.unsqueeze(-1))
+                  .add_input(conc_gas)
+                  .build();
+
+  // call the evaluation function
+  at::native::call_func3(entropy_R_extra.device().type(), iter,
+                         op.entropy_R_extra().data());
+
+  // std::cout << "entropy_R_extra = " << entropy_R_extra << std::endl;
+
+  auto sref_R = torch::tensor(op.sref_R(), temp.options());
+  auto cp_gas_R = torch::tensor(op.cref_R(), temp.options()).narrow(0, 0, ngas);
+  cp_gas_R += 1;
+
+  auto entropy_R = torch::zeros_like(conc);
+
+  // gas entropy
+  entropy_R.narrow(-1, 0, ngas) =
+      sref_R.narrow(0, 0, ngas) + entropy_R_extra +
+      temp.log().unsqueeze(-1) * cp_gas_R - pres.log().unsqueeze(-1) -
+      (conc_gas / conc_gas.sum(-1, /*keepdim=*/true)).log();
+
   //////////// Evaluate condensate entropy ////////////
 
   // (1) Evaluate log-svp
-  user_func1* logsvp_func = new user_func1[op.react().size()];
-  for (int i = 0; i < op.react().size(); ++i) {
-    logsvp_func[i] = op.react()[i].func();
-  }
-
   // bundle iterator
   auto vec1 = temp.sizes().vec();
-  vec1.push_back(op.react().size());
+  vec1.push_back(op.nucleation().reactions().size());
   auto logsvp = torch::zeros(vec1, temp.options());
   iter = at::TensorIteratorConfig()
              .resize_outputs(false)
@@ -206,7 +260,8 @@ torch::Tensor eval_entropy_R(torch::Tensor temp, torch::Tensor pres,
              .build();
 
   // call the evaluation function
-  at::native::call_func1(logsvp.device().type(), iter, logsvp_func);
+  at::native::call_func1(logsvp.device().type(), iter,
+                         op.nucleation().logsvp().data());
   // std::cout << "logsvp = " << logsvp << std::endl;
 
   // (2) Evaluate enthalpies (..., R)
@@ -238,16 +293,14 @@ torch::Tensor eval_entropy_R(torch::Tensor temp, torch::Tensor pres,
   entropy_R.narrow(-1, ngas, ncloud) =
       sp_inv.view(vec2).matmul(b.unsqueeze(-1)).squeeze(-1);
 
-  delete[] logsvp_func;
-
   // std::cout << "entropy_R = " << entropy_R << std::endl;
 
   return entropy_R;
 }
 
 torch::Tensor eval_enthalpy_R(torch::Tensor temp, torch::Tensor conc,
-                              ThermoOptions const& op) {
-  int ngas = 1 + op.vapor_ids().size();
+                              SpeciesThermo const& op) {
+  int ngas = op.vapor_ids().size();
   int ncloud = op.cloud_ids().size();
 
   // check dimension consistency
