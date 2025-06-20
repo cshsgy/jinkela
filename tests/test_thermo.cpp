@@ -9,7 +9,6 @@
 
 #include <kintera/eos/equation_of_state.hpp>
 #include <kintera/thermo/eval_uhs.hpp>
-#include <kintera/thermo/extrapolate_ad.hpp>
 #include <kintera/thermo/relative_humidity.hpp>
 #include <kintera/thermo/thermo.hpp>
 #include <kintera/thermo/thermo_formatter.hpp>
@@ -282,7 +281,7 @@ TEST_P(DeviceTest, extrapolate_ad) {
   std::cout << "entropy before = " << entropy_mole0 << std::endl;
   std::cout << "temp before = " << temp << std::endl;
 
-  extrapolate_ad_(temp, pres, xfrac, thermo_x, -0.1);
+  thermo_x->extrapolate_ad(temp, pres, xfrac, -0.1);
 
   conc = thermo_x->compute("TPX->V", {temp, pres, xfrac});
   entropy_vol = thermo_x->compute("TPV->S", {temp, pres, conc});
