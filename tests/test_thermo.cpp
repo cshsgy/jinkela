@@ -7,7 +7,6 @@
 // kintera
 #include <kintera/constants.h>
 
-#include <kintera/eos/equation_of_state.hpp>
 #include <kintera/thermo/eval_uhs.hpp>
 #include <kintera/thermo/relative_humidity.hpp>
 #include <kintera/thermo/thermo.hpp>
@@ -315,7 +314,8 @@ TEST_P(DeviceTest, relative_humidity) {
   thermo_x->forward(temp, pres, xfrac);
 
   auto conc = thermo_x->compute("TPX->V", {temp, pres, xfrac});
-  auto rh = relative_humidity(temp, conc, thermo_x->stoich, thermo_x->options);
+  auto rh = relative_humidity(temp, conc, thermo_x->stoich,
+                              thermo_x->options.nucleation());
   std::cout << "rh = " << rh << std::endl;
   EXPECT_LE(rh.min().item<float>(), 1.0);
   EXPECT_GE(rh.max().item<float>(), 0.0);

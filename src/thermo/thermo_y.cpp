@@ -13,52 +13,25 @@ namespace kintera {
 extern std::vector<double> species_weights;
 
 ThermoYImpl::ThermoYImpl(const ThermoOptions &options_) : options(options_) {
-  auto nspecies = options.species().size();
+  populate_thermo(options);
+  reset();
+}
 
-  // populate higher-order thermodynamic functions
-  while (options.intEng_R_extra().size() < nspecies) {
-    options.intEng_R_extra().push_back(nullptr);
-  }
-
-  while (options.entropy_R_extra().size() < nspecies) {
-    options.entropy_R_extra().push_back(nullptr);
-  }
-
-  while (options.cv_R_extra().size() < nspecies) {
-    options.cv_R_extra().push_back(nullptr);
-  }
-
-  while (options.cp_R_extra().size() < nspecies) {
-    options.cp_R_extra().push_back(nullptr);
-  }
-
-  while (options.czh().size() < nspecies) {
-    options.czh().push_back(nullptr);
-  }
-
-  while (options.czh_ddC().size() < nspecies) {
-    options.czh_ddC().push_back(nullptr);
-  }
-
+ThermoYImpl::ThermoYImpl(const ThermoOptions &options1_,
+                         const SpeciesThermo &options2_)
+    : options(options1_) {
+  auto options2 = options2_;
+  populate_thermo(options);
+  populate_thermo(options2);
+  static_cast<SpeciesThermo &>(options) = merge_thermo(options, options2);
   reset();
 }
 
 void ThermoYImpl::reset() {
-  auto reactions = options.reactions();
   auto species = options.species();
   auto nspecies = species.size();
 
-  TORCH_CHECK(options.cref_R().size() == nspecies,
-              "cref_R size = ", options.cref_R().size(),
-              ". Expected = ", nspecies);
-
-  TORCH_CHECK(options.uref_R().size() == nspecies,
-              "uref_R size = ", options.uref_R().size(),
-              ". Expected = ", nspecies);
-
-  TORCH_CHECK(options.sref_R().size() == nspecies,
-              "sref_R size = ", options.sref_R().size(),
-              ". Expected = ", nspecies);
+  check_dimensions(options);
 
   std::vector<double> mu_vec(nspecies);
   for (int i = 0; i < options.vapor_ids().size(); ++i) {
@@ -82,6 +55,11 @@ void ThermoYImpl::reset() {
         (options.cref_R()[i] + 1) * log(options.Tref()) - log(options.Pref());
   }
 
+  // set cloud entropy offset to 0 (not used)
+  for (int i = options.vapor_ids().size(); i < options.sref_R().size(); ++i) {
+    options.sref_R()[i] = 0.;
+  }
+
   auto cv_R = torch::tensor(options.cref_R(), torch::kFloat64);
   auto uref_R = torch::tensor(options.uref_R(), torch::kFloat64);
 
@@ -92,6 +70,7 @@ void ThermoYImpl::reset() {
   u0 = register_buffer("u0", uref_R * constants::Rgas * inv_mu);
 
   // populate stoichiometry matrix
+  auto reactions = options.reactions();
   stoich = register_buffer(
       "stoich",
       torch::zeros({(int)nspecies, (int)reactions.size()}, torch::kFloat64));

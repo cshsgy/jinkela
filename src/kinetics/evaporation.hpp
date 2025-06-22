@@ -12,6 +12,7 @@
 
 // kintera
 #include <kintera/reaction.hpp>
+#include <kintera/thermo/nucleation.hpp>
 
 // arg
 #include <kintera/add_arg.h>
@@ -23,7 +24,7 @@ class Node;
 namespace kintera {
 
 //! Options to initialize all reaction rate constants
-struct EvaporationOptions {
+struct EvaporationOptions : public NucleationOptions {
   static EvaporationOptions from_yaml(const YAML::Node& node);
 
   // reference temperature
@@ -32,10 +33,7 @@ struct EvaporationOptions {
   // reference pressure
   ADD_ARG(double, Pref) = 1.e5;
 
-  //! reactions
-  ADD_ARG(std::vector<Reaction>, reactions) = {};
-
-  //! Diffusivity [cm^2/s] at reference temperature and pressure
+  //! Diffusivity [m^2/s] at reference temperature and pressure
   ADD_ARG(std::vector<double>, diff_c) = {};
 
   //! Diffusivity temperature exponent
@@ -44,10 +42,10 @@ struct EvaporationOptions {
   //! Diffusivity pressure exponent
   ADD_ARG(std::vector<double>, diff_P) = {};
 
-  //! Molar volume [cm^3/mol]
+  //! Molar volume [m^3/mol]
   ADD_ARG(std::vector<double>, vm) = {};
 
-  //! Particle diameter [cm]
+  //! Particle diameter [m]
   ADD_ARG(std::vector<double>, diameter) = {};
 };
 
@@ -57,16 +55,16 @@ void add_to_vapor_cloud(std::set<std::string>& vapor_set,
 
 class EvaporationImpl : public torch::nn::Cloneable<EvaporationImpl> {
  public:
-  //! diffusivity ln[m^2/s], shape (nreaction,)
-  torch::Tensor log_diff_c,
+  //! diffusivity m^2/s, shape (nreaction,)
+  torch::Tensor diff_c,
       diff_T,  // temperature exponent
       diff_P;  // pressure exponent
 
-  //! molar volume ln[m^3/mol], shape (nreaction,)
-  torch::Tensor log_vm;
+  //! molar volume m^3/mol, shape (nreaction,)
+  torch::Tensor vm;
 
-  //! log particle diameter ln[m], shape (nreaction,)
-  torch::Tensor log_diameter;
+  //! log particle diameter m, shape (nreaction,)
+  torch::Tensor diameter;
 
   //! options with which this `EvaporationImpl` was constructed
   EvaporationOptions options;
@@ -77,14 +75,15 @@ class EvaporationImpl : public torch::nn::Cloneable<EvaporationImpl> {
   void reset() override;
   void pretty_print(std::ostream& os) const override;
 
-  //! Compute the log rate constant
+  //! Compute the rate constant
   /*!
    * \param T temperature [K], shape (...)
    * \param P pressure [pa], shape (...)
+   * \param C concentration [mol/m^3], shape (..., nspecies)
    * \param other additional parameters, e.g., concentration
-   * \return log rate constant in ln(mol, m, s), shape (..., nreaction)
+   * \return rate constant in (mol, m, s), shape (..., nreaction)
    */
-  torch::Tensor forward(torch::Tensor T, torch::Tensor P,
+  torch::Tensor forward(torch::Tensor T, torch::Tensor P, torch::Tensor C,
                         std::map<std::string, torch::Tensor> const& other);
 };
 TORCH_MODULE(Evaporation);

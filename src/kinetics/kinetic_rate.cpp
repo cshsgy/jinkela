@@ -1,58 +1,23 @@
 // kintera
 #include "kinetic_rate.hpp"
 
-#include <kintera/utils/check_resize.hpp>
+#include <kintera/constants.h>
+
+#include <kintera/thermo/eval_uhs.hpp>
 
 namespace kintera {
 
 KineticRateImpl::KineticRateImpl(const KineticRateOptions& options_)
     : options(options_) {
-  auto nspecies = options.species().size();
-
-  // populate higher-order thermodynamic functions
-  while (options.intEng_R_extra().size() < nspecies) {
-    options.intEng_R_extra().push_back(nullptr);
-  }
-
-  while (options.entropy_R_extra().size() < nspecies) {
-    options.entropy_R_extra().push_back(nullptr);
-  }
-
-  while (options.cv_R_extra().size() < nspecies) {
-    options.cv_R_extra().push_back(nullptr);
-  }
-
-  while (options.cp_R_extra().size() < nspecies) {
-    options.cp_R_extra().push_back(nullptr);
-  }
-
-  while (options.czh().size() < nspecies) {
-    options.czh().push_back(nullptr);
-  }
-
-  while (options.czh_ddC().size() < nspecies) {
-    options.czh_ddC().push_back(nullptr);
-  }
-
+  populate_thermo(options);
   reset();
 }
 
 void KineticRateImpl::reset() {
-  auto reactions = options.reactions();
   auto species = options.species();
   auto nspecies = species.size();
 
-  TORCH_CHECK(options.cref_R().size() == nspecies,
-              "cref_R size = ", options.cref_R().size(),
-              ". Expected = ", nspecies);
-
-  TORCH_CHECK(options.uref_R().size() == nspecies,
-              "uref_R size = ", options.uref_R().size(),
-              ". Expected = ", nspecies);
-
-  TORCH_CHECK(options.sref_R().size() == nspecies,
-              "sref_R size = ", options.sref_R().size(),
-              ". Expected = ", nspecies);
+  check_dimensions(options);
 
   // change internal energy offset to T = 0
   for (int i = 0; i < options.uref_R().size(); ++i) {
@@ -65,6 +30,12 @@ void KineticRateImpl::reset() {
         (options.cref_R()[i] + 1) * log(options.Tref()) - log(options.Pref());
   }
 
+  // set cloud entropy offset to 0 (not used)
+  for (int i = options.vapor_ids().size(); i < options.sref_R().size(); ++i) {
+    options.sref_R()[i] = 0.;
+  }
+
+  auto reactions = options.reactions();
   // order = register_buffer("order",
   //     torch::zeros({nspecies, nreaction}), torch::kFloat64);
   stoich = register_buffer(
@@ -85,70 +56,127 @@ void KineticRateImpl::reset() {
     }
   }
 
-  // placeholder for log rate constant
-  logrc_ddT = register_buffer("logrc_ddT", torch::zeros({1}, torch::kFloat64));
+  _nreactions.clear();
 
   // register Arrhenius rates
-  rce.push_back(torch::nn::AnyModule(Arrhenius(options.arrhenius())));
-  register_module("arrhenius", rce.back().ptr());
+  rc_evaluator.push_back(torch::nn::AnyModule(Arrhenius(options.arrhenius())));
+  register_module("arrhenius", rc_evaluator.back().ptr());
+  _nreactions.push_back(options.arrhenius().reactions().size());
 
   // register Coagulation rates
-  rce.push_back(torch::nn::AnyModule(Arrhenius(options.coagulation())));
-  register_module("coagulation", rce.back().ptr());
+  rc_evaluator.push_back(
+      torch::nn::AnyModule(Arrhenius(options.coagulation())));
+  register_module("coagulation", rc_evaluator.back().ptr());
+  _nreactions.push_back(options.coagulation().reactions().size());
 
   // register Evaporation rates
-  rce.push_back(torch::nn::AnyModule(Evaporation(options.evaporation())));
-  register_module("evaporation", rce.back().ptr());
+  rc_evaluator.push_back(
+      torch::nn::AnyModule(Evaporation(options.evaporation())));
+  register_module("evaporation", rc_evaluator.back().ptr());
+  _nreactions.push_back(options.evaporation().reactions().size());
 }
 
-torch::Tensor KineticRateImpl::forward(torch::Tensor temp, torch::Tensor pres,
-                                       torch::Tensor conc) {
-  // compute Arrhenius rate constants
-  std::map<std::string, torch::Tensor> other = {};
-  other["conc"] = conc;
+torch::Tensor KineticRateImpl::jacobian(
+    torch::Tensor temp, torch::Tensor conc, torch::Tensor cvol,
+    torch::Tensor rate, torch::Tensor rc_ddC,
+    torch::optional<torch::Tensor> rc_ddT) const {
+  auto stoich_local = (-stoich).clamp_min(0.0).t();
 
-  // batch dimensions
-  auto vec = temp.sizes().vec();
-  vec.push_back(stoich.size(1));
+  // concentration products
+  auto concp = conc.unsqueeze(-2).pow(stoich_local).prod(-1, /*keepdim=*/true);
 
-  auto result = torch::empty(vec, temp.options());
+  // part I, concentration derivative
+  auto jacobian =
+      concp * rc_ddC.transpose(-1, -2) +
+      stoich_local * rate.unsqueeze(-1) / conc.unsqueeze(-2).clamp_min(1e-20);
+
+  // part II, add temperature derivative if provided
+  if (rc_ddT.has_value()) {
+    auto intEng = eval_intEng_R(temp, conc, options) * constants::Rgas;
+    jacobian -= concp * rc_ddT.value().unsqueeze(-1) * intEng.unsqueeze(-2) /
+                cvol.unsqueeze(-1).unsqueeze(-1);
+  }
+
+  return jacobian;
+}
+
+std::tuple<torch::Tensor, torch::Tensor, torch::optional<torch::Tensor>>
+KineticRateImpl::forward(torch::Tensor temp, torch::Tensor pres,
+                         torch::Tensor conc) {
+  // dimension of reaction rate constants
+  auto vec1 = temp.sizes().vec();
+  vec1.push_back(stoich.size(1));
+  auto result = torch::empty(vec1, temp.options());
+
+  // dimension of rate constant derivatives
+  auto vec2 = conc.sizes().vec();
+  vec2.push_back(stoich.size(1));
+  auto rc_ddC = torch::empty(vec2, conc.options());
+
+  // optional temperature derivative
+  torch::optional<torch::Tensor> rc_ddT;
 
   // track rate constant derivative
   if (options.evolve_temperature()) {
-    temp.requires_grad_(true);
+    rc_ddT = torch::empty(vec1, temp.options());
   }
 
-  logrc_ddT.set_(check_resize(logrc_ddT, vec, temp.options()));
-
+  // other data passed to rate constant evaluator
+  std::map<std::string, torch::Tensor> other = {};
   int first = 0;
-  for (int i = 0; i < rce.size(); ++i) {
-    auto logr = rce[i].forward(temp, pres, other);
-    int nreactions = logr.size(-1);
+  for (int i = 0; i < rc_evaluator.size(); ++i) {
+    // no reaction, skip
+    if (_nreactions[i] == 0) continue;
+
+    other["stoich"] = stoich.narrow(1, first, _nreactions[i]);
+
+    torch::Tensor rate;
+
+    vec2.back() = _nreactions[i];
+    auto conc1 = conc.unsqueeze(-1).expand(vec2);
+    conc1.requires_grad_(true);
 
     if (options.evolve_temperature()) {
-      auto identity = torch::eye(nreactions, logr.options());
-      logr.backward(identity);
-      logrc_ddT.narrow(1, first, nreactions) = temp.grad().unsqueeze(-1);
+      vec1.back() = _nreactions[i];
+      auto temp1 = temp.unsqueeze(-1).expand(vec1);
+      temp1.requires_grad_(true);
+
+      rate = rc_evaluator[i].forward(temp1, pres, conc1, other);
+
+      rate.backward(torch::ones_like(rate));
+
+      if (conc1.grad().defined()) {
+        rc_ddC.narrow(-1, first, _nreactions[i]) = conc1.grad();
+      } else {
+        rc_ddC.narrow(-1, first, _nreactions[i]).fill_(0.);
+      }
+
+      if (temp1.grad().defined()) {
+        rc_ddT.value().narrow(-1, first, _nreactions[i]) = temp1.grad();
+      } else {
+        rc_ddT.value().narrow(-1, first, _nreactions[i]).fill_(0.);
+      }
+    } else {
+      rate = rc_evaluator[i].forward(temp, pres, conc1, other);
+      rate.requires_grad_(true);
+      rate.backward(torch::ones_like(rate));
+
+      if (conc1.grad().defined()) {
+        rc_ddC.narrow(-1, first, _nreactions[i]) = conc1.grad();
+      } else {
+        rc_ddC.narrow(-1, first, _nreactions[i]).fill_(0.);
+      }
     }
 
-    // mark reactants
-    auto sm = stoich.narrow(1, first, nreactions).clamp_max(0.).abs();
-
-    std::vector<int64_t> vec2(temp.dim(), 1);
-    vec2.push_back(sm.size(0));
-    vec2.push_back(sm.size(1));
-
-    logr += conc.log().unsqueeze(-2).matmul(sm.view(vec2)).squeeze(-2);
-    result.narrow(1, first, nreactions) = logr.exp();
-
-    first += nreactions;
+    result.narrow(-1, first, _nreactions[i]) = rate;
+    first += _nreactions[i];
   }
 
-  if (options.evolve_temperature()) {
-    temp.requires_grad_(false);
-  }
+  // mark reactants
+  auto sm = stoich.clamp_max(0.).abs();
+  result *= conc.unsqueeze(-1).pow(sm).prod(-2);
 
-  return result;
+  return std::make_tuple(result, rc_ddC, rc_ddT);
 }
 
 }  // namespace kintera

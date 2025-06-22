@@ -35,9 +35,7 @@ struct ThermoOptions : public SpeciesThermo {
   //! \brief Create a `ThermoOptions` object from a YAML file
   /*!
    * This function reads a YAML file and creates a `ThermoOptions`
-   * object from it. The YAML file must contain the following fields:
-   *  - "vapor": list of vapor species
-   *  - "cloud": list of cloud species
+   * object from it.
    */
   static ThermoOptions from_yaml(std::string const& filename);
   ThermoOptions() = default;
@@ -73,6 +71,7 @@ class ThermoYImpl : public torch::nn::Cloneable<ThermoYImpl> {
 
   ThermoYImpl() = default;
   explicit ThermoYImpl(const ThermoOptions& options_);
+  ThermoYImpl(const ThermoOptions& options1_, const SpeciesThermo& options2);
   void reset() override;
   void pretty_print(std::ostream& os) const override;
 
@@ -207,6 +206,7 @@ class ThermoXImpl : public torch::nn::Cloneable<ThermoXImpl> {
 
   ThermoXImpl() = default;
   explicit ThermoXImpl(const ThermoOptions& options_);
+  ThermoXImpl(const ThermoOptions& options1_, const SpeciesThermo& options2_);
   void reset() override;
   void pretty_print(std::ostream& os) const override;
 

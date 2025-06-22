@@ -2,6 +2,7 @@
 
 // C/C++
 #include <string>
+#include <vector>
 
 // kintera
 #include <kintera/utils/func2.hpp>
@@ -9,6 +10,10 @@
 
 // arg
 #include "add_arg.h"
+
+namespace at {
+class Tensor;
+}  // namespace at
 
 namespace kintera {
 
@@ -19,6 +24,10 @@ struct SpeciesThermo {
 
   //! \return species names
   std::vector<std::string> species() const;
+
+  at::Tensor narrow_copy(at::Tensor data, SpeciesThermo const& other) const;
+  void accumulate(at::Tensor& data, at::Tensor const& other_data,
+                  SpeciesThermo const& other) const;
 
   ADD_ARG(std::vector<int>, vapor_ids);
   ADD_ARG(std::vector<int>, cloud_ids);
@@ -45,6 +54,13 @@ struct SpeciesThermo {
   //! valid numbers. The rests are no-ops.
   ADD_ARG(std::vector<user_func2>, czh_ddC);
 };
+
+void populate_thermo(SpeciesThermo& thermo);
+
+void check_dimensions(SpeciesThermo const& thermo);
+
+SpeciesThermo merge_thermo(SpeciesThermo const& thermo1,
+                           SpeciesThermo const& thermo2);
 
 }  // namespace kintera
 
