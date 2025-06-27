@@ -3,6 +3,9 @@
 // C/C++
 #include <cstdio>
 
+// base
+#include <configure.h>
+
 namespace kintera {
 
 /*!
@@ -15,10 +18,11 @@ namespace kintera {
  * \param[in] n3 number of columns in matrix b
  */
 template <typename T>
-void mmdot(T *r, T const *a, T const *b, int n1, int n2, int n3) {
+DISPATCH_MACRO void mmdot(T *r, T const *a, T const *b, int n1, int n2,
+                          int n3) {
   // Check if r, a, and b are not the same
   if (r == a || r == b || a == b) {
-    fprintf(stderr, "Error: r, a, and b must be distinct pointers.\n");
+    printf("Error: r, a, and b must be distinct pointers.\n");
     return;
   }
 

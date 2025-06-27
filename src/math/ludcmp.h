@@ -5,6 +5,9 @@
 #include <cstdio>
 #include <cstdlib>
 
+// base
+#include <configure.h>
+
 #define A(i, j) a[(i) * n + (j)]
 
 namespace kintera {
@@ -25,7 +28,7 @@ namespace kintera {
  * \param[in] n size of matrix
  */
 template <typename T>
-int ludcmp(T *a, int *indx, int n) {
+DISPATCH_MACRO int ludcmp(T *a, int *indx, int n) {
   int i, imax, j, k, d;
   T big, dum, sum, temp;
   T *vv = (T *)malloc(n * sizeof(T));
@@ -36,8 +39,9 @@ int ludcmp(T *a, int *indx, int n) {
     for (j = 0; j < n; j++)
       if ((temp = fabs(A(i, j))) > big) big = temp;
     if (big == 0.0) {
-      fprintf(stderr, "Singular matrix in routine ludcmp");
-      exit(1);
+      printf("Singular matrix in routine ludcmp");
+      free(vv);
+      return 1;
     }
     vv[i] = 1.0 / big;
   }

@@ -4,6 +4,9 @@
 #include <cstdio>
 #include <cstdlib>
 
+// base
+#include <configure.h>
+
 // math
 #include "lubksb.h"
 #include "ludcmp.h"
@@ -16,8 +19,8 @@
 namespace kintera {
 
 template <typename T>
-void populate_aug(T *aug, T const *ata, T const *c, int n2, int nact,
-                  int const *ct_indx) {
+DISPATCH_MACRO void populate_aug(T *aug, T const *ata, T const *c, int n2,
+                                 int nact, int const *ct_indx) {
   // populate A^T.A (upper left block)
   for (int i = 0; i < n2; ++i) {
     for (int j = 0; j < n2; ++j) {
@@ -48,8 +51,8 @@ void populate_aug(T *aug, T const *ata, T const *c, int n2, int nact,
 }
 
 template <typename T>
-void populate_rhs(T *rhs, T const *atb, T const *d, int n2, int nact,
-                  int const *ct_indx) {
+DISPATCH_MACRO void populate_rhs(T *rhs, T const *atb, T const *d, int n2,
+                                 int nact, int const *ct_indx) {
   // populate A^T.b (upper part)
   for (int i = 0; i < n2; ++i) {
     rhs[i] = atb[i];
@@ -84,19 +87,18 @@ void populate_rhs(T *rhs, T const *atb, T const *d, int n2, int nact,
  *         2 on failure (max_iter reached without convergence).
  */
 template <typename T>
-int leastsq_kkt(T *b, T const *a, T const *c, T const *d, int n1, int n2,
-                int n3, int neq, int *max_iter) {
+DISPATCH_MACRO int leastsq_kkt(T *b, T const *a, T const *c, T const *d, int n1,
+                               int n2, int n3, int neq, int *max_iter) {
   // check if n1 > 0, n2 > 0, n3 >= 0
   if (n1 <= 0 || n2 <= 0 || n3 < 0 || n1 < n2) {
-    fprintf(
-        stderr,
+    printf(
         "Error: n1 and n2 must be positive integers and n3 >= 0, n1 >= n2.\n");
     return 1;  // invalid input
   }
 
   // check if 0 <= neq <= n3
   if (neq < 0 || neq > n3) {
-    fprintf(stderr, "Error: neq must be non-negative.\n");
+    printf("Error: neq must be non-negative.\n");
     return 1;  // invalid input
   }
 
@@ -272,9 +274,8 @@ int leastsq_kkt(T *b, T const *a, T const *c, T const *d, int n1, int n2,
 
   if (iter >= *max_iter) {
     *max_iter = iter;
-    fprintf(stderr,
-            "Warning: leastsq_kkt maximum number of iterations reached (%d).\n",
-            *max_iter);
+    printf("Warning: leastsq_kkt maximum number of iterations reached (%d).\n",
+           *max_iter);
     return 2;  // failure to converge
   }
 

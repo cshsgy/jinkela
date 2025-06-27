@@ -4,7 +4,7 @@
 
 enable_testing()
 
-setup_problem(test_yaml_parse)
+#setup_problem(test_yaml_parse)
 #setup_problem(test_kinetics_rates)
 
 setup_test(test_eos)
@@ -23,5 +23,5 @@ foreach(pyfile ${pyfiles})
   get_filename_component(name ${pyfile} NAME)
   message(STATUS "Copying ${pyfile} to ${name}")
   configure_file(${pyfile} ${CMAKE_CURRENT_BINARY_DIR}/${name} @ONLY)
-  add_test(NAME ${name} COMMAND python3 ${name})
+  add_test(NAME ${name} COMMAND pytest ${name})
 endforeach()

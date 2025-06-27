@@ -7,6 +7,7 @@
 #
 #   KINTERA_INCLUDE_DIR
 #   kintera::kintera
+#   kintera::vapors
 #   kintera::kintera_cu
 #
 # Normal usage would be:
@@ -19,6 +20,7 @@ include_directories(
   ${CMAKE_BINARY_DIR}
   SYSTEM ${TORCH_API_INCLUDE_DIR}
   SYSTEM ${TORCH_INCLUDE_DIR}
+  SYSTEM ${HARP_INCLUDE_DIR}
   )
 
 string(TOLOWER ${CMAKE_BUILD_TYPE} buildl)
@@ -39,7 +41,7 @@ file(GLOB src_files
   )
 
 add_library(${namel}_${buildl}
-    STATIC
+    SHARED
     ${src_files}
     )
 
@@ -50,10 +52,12 @@ set_target_properties(${namel}_${buildl}
 
 target_link_libraries(${namel}_${buildl}
     PUBLIC
-    pyharp::harp
+    fmt::fmt
+    yaml-cpp::yaml-cpp
     ${TORCH_LIBRARY}
     ${TORCH_CPU_LIBRARY}
     ${C10_LIBRARY}
+    ${HARP_LIBRARY}
     )
 
 add_library(kintera::kintera ALIAS ${namel}_${buildl})
@@ -62,11 +66,11 @@ add_library(kintera::kintera ALIAS ${namel}_${buildl})
 if (CUDAToolkit_FOUND)
   file(GLOB cu_src_files
     *.cu
-    eos/*.cu
+    thermo/*.cu
     )
 
   add_library(${namel}_cuda_${buildl}
-      STATIC
+      SHARED
       ${cu_src_files}
       )
 
