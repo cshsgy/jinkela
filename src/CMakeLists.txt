@@ -58,6 +58,7 @@ target_link_libraries(${namel}_${buildl}
     ${TORCH_CPU_LIBRARY}
     ${C10_LIBRARY}
     ${HARP_LIBRARY}
+    ${DISORT_LIBRARY}
     )
 
 add_library(kintera::kintera ALIAS ${namel}_${buildl})
@@ -67,6 +68,7 @@ if (CUDAToolkit_FOUND)
   file(GLOB cu_src_files
     *.cu
     thermo/*.cu
+    utils/*.cu
     )
 
   add_library(${namel}_cuda_${buildl}
