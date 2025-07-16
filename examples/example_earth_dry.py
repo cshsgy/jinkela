@@ -14,24 +14,16 @@ from kintera import (
 torch.set_default_dtype(torch.float64)
 
 def setup_earth_thermo():
-    kintera.set_species_names(["dry", "H2O", "H2O(l)"])
-    kintera.set_species_weights([29.e-3, 18.e-3, 18.e-3])
+    kintera.set_species_names(["dry"])
+    kintera.set_species_weights([29.e-3])
 
-    nucleation = NucleationOptions()
-    nucleation.reactions([Reaction("H2O <=> H2O(l)")])
-    nucleation.minT([200.0])
-    nucleation.maxT([400.0])
-    nucleation.set_logsvp(["h2o_ideal"])
-
-    op = ThermoOptions().max_iter(15).ftol(1.e-8)
-    op.vapor_ids([0, 1])
-    op.cloud_ids([2])
-    op.cref_R([2.5, 2.5, 9.0])
-    op.uref_R([0.0, 0.0, -3430.])
-    op.sref_R([0.0, 0.0, 0.0])
+    op = ThermoOptions()
+    op.vapor_ids([0])
+    op.cref_R([2.5])
+    op.uref_R([0.0])
+    op.sref_R([0.0])
     op.Tref(300.0)
     op.Pref(1.e5)
-    op.nucleation(nucleation)
 
     return ThermoX(op)
 
@@ -52,10 +44,7 @@ if __name__ == "__main__":
 
     temp = Tbot * torch.ones((ncol, nlyr))
     pres = pmax * torch.ones((ncol, nlyr))
-    xfrac = torch.zeros((ncol, nlyr, nspecies))
-
-    # set bottom concentration
-    xfrac[:, 0, :] = torch.tensor([0.98, 0.02, 0.])
+    xfrac = torch.ones((ncol, nlyr, nspecies))
 
     # calculate equilibrium condensation at the bottom layer
     thermo.forward(temp[:, 0], pres[:, 0], xfrac[:, 0, :])
@@ -81,12 +70,7 @@ if __name__ == "__main__":
     # compute molar entropy
     entropy_mol = entropy_vol / conc.sum(dim=-1)
 
-    # compute relative humdity
-    stoich = thermo.get_buffer("stoich")
-    rh = relative_humidity(temp, conc, stoich, thermo.options.nucleation())
-
     print("temp = ", temp)
     print("pres = ", pres)
     print("xfrac = ", xfrac)
     print("entropy_mol = ", entropy_mol)
-    print("rh = ", rh)
