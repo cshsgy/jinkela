@@ -96,9 +96,11 @@ DISPATCH_MACRO int equilibrate_uv(T *gain, T *diag, T *temp, T *conc, T h0,
 
   // weight matrix
   T *weight = (T *)malloc(nreaction * nspecies * sizeof(T));
+  memset(weight, 0, nreaction * nspecies * sizeof(T));
 
   // right-hand-side vector
   T *rhs = (T *)malloc(nreaction * sizeof(T));
+  memset(rhs, 0, nreaction * sizeof(T));
 
   // active set
   int *reaction_set = (int *)malloc(nreaction * sizeof(int));
@@ -153,7 +155,7 @@ DISPATCH_MACRO int equilibrate_uv(T *gain, T *diag, T *temp, T *conc, T h0,
 
       // active set condition variables
       for (int i = 0; i < nspecies; i++) {
-        if (stoich[i * nreaction + j] < 0) {  // reactant
+        if ((stoich[i * nreaction + j] < 0) && (conc[i] > 0.)) {  // reactant
           log_conc_sum += (-stoich[i * nreaction + j]) * log(conc[i]);
         } else if (stoich[i * nreaction + j] > 0) {  // product
           prod *= conc[i];
@@ -166,7 +168,7 @@ DISPATCH_MACRO int equilibrate_uv(T *gain, T *diag, T *temp, T *conc, T h0,
         for (int i = 0; i < nspecies; i++) {
           weight[first * nspecies + i] =
               logsvp_ddT[j] * intEng[i] / heat_capacity;
-          if (stoich[i * nreaction + j] < 0) {
+          if ((stoich[i * nreaction + j] < 0) && (conc[i] > 0.)) {
             weight[first * nspecies + i] +=
                 (-stoich[i * nreaction + j]) / conc[i];
           }
@@ -273,9 +275,8 @@ DISPATCH_MACRO int equilibrate_uv(T *gain, T *diag, T *temp, T *conc, T h0,
   free(gain_cpy);
 
   if (iter >= *max_iter) {
-    printf("Saturation adjustment did not converge after %d iterations.\n",
-           *max_iter);
-    return 2;  // failure to converge
+    printf("equilibrate_uv did not converge after %d iterations.\n", *max_iter);
+    return 2 * 10 + err_code;  // failure to converge
   } else {
     *max_iter = iter;
     return err_code;  // success or KKT error

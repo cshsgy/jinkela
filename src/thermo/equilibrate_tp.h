@@ -76,9 +76,11 @@ DISPATCH_MACRO int equilibrate_tp(T *gain, T *diag, T *xfrac, T temp, T pres,
 
   // weight matrix
   T *weight = (T *)malloc(nreaction * nspecies * sizeof(T));
+  memset(weight, 0, nreaction * nspecies * sizeof(T));
 
   // right-hand-side vector
   T *rhs = (T *)malloc(nreaction * sizeof(T));
+  memset(rhs, 0, nreaction * sizeof(T));
 
   // active set
   int *reaction_set = (int *)malloc(nreaction * sizeof(int));
@@ -132,7 +134,7 @@ DISPATCH_MACRO int equilibrate_tp(T *gain, T *diag, T *xfrac, T temp, T pres,
 
       // active set condition variables
       for (int i = 0; i < nspecies; i++) {
-        if (stoich[i * nreaction + j] < 0) {  // reactant
+        if ((stoich[i * nreaction + j] < 0) && (xfrac[i] > 0.)) {  // reactant
           log_frac_sum += (-stoich[i * nreaction + j]) * log(xfrac[i] / xg);
         } else if (stoich[i * nreaction + j] > 0) {  // product
           prod *= xfrac[i];
@@ -144,7 +146,7 @@ DISPATCH_MACRO int equilibrate_tp(T *gain, T *diag, T *xfrac, T temp, T pres,
           (log_frac_sum > (logsvp[j] + logsvp_eps))) {
         for (int i = 0; i < ngas; i++) {
           weight[first * nspecies + i] = -stoich_sum[j] / xg;
-          if (stoich[i * nreaction + j] < 0) {
+          if ((stoich[i * nreaction + j] < 0) && (xfrac[i] > 0.)) {
             weight[first * nspecies + i] -=
                 stoich[i * nreaction + j] / xfrac[i];
           }
