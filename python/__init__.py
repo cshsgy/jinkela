@@ -20,4 +20,4 @@ def load_once(name):
 load_once("libkintera_release.so")
 load_once("libkintera_cuda_release.so")
 
-__version__ = "0.8.1"
+__version__ = "0.8.2"
