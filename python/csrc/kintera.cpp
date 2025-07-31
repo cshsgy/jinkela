@@ -5,8 +5,9 @@
 #include <torch/extension.h>
 
 // kintera
+#include <kintera/kinetics/evolve_implicit.hpp>
 #include <kintera/kintera_formatter.hpp>
-#include <kintera/thermo/thermo.hpp>
+#include <kintera/species.hpp>
 #include <kintera/utils/find_resource.hpp>
 
 // python
@@ -26,6 +27,7 @@ extern std::vector<double> species_sref_R;
 
 void bind_thermo(py::module &m);
 void bind_constants(py::module &m);
+void bind_kinetics(py::module &m);
 
 PYBIND11_MODULE(kintera, m) {
   m.attr("__name__") = "kintera";
@@ -62,6 +64,9 @@ Examples:
     >> op.species()
     ['H2', 'O2', 'N2', 'Ar']
       )doc")
+
+      .def("narrow_copy", &kintera::SpeciesThermo::narrow_copy, R"()")
+      .def("accumulate", &kintera::SpeciesThermo::accumulate, R"()")
 
       .ADD_OPTION(std::vector<int>, kintera::SpeciesThermo, vapor_ids, R"doc(
 Set or get the vapor species IDs.
@@ -237,6 +242,7 @@ Examples:
 
   bind_thermo(m);
   bind_constants(m);
+  bind_kinetics(m);
 
   m.def(
       "species_names",
@@ -393,4 +399,19 @@ Example:
     >>> print(path)  # /path/to/resource/files/example.txt
       )doc",
         py::arg("filename"));
+
+  m.def("evolve_implicit", &kintera::evolve_implicit,
+        R"doc(
+Evolve the kinetics model via implicit integration.
+
+Args:
+  rate (torch.Tensor): The reaction rates.
+  stoich (torch.Tensor): The stoichiometric matrix.
+  jacobian (torch.Tensor): The Jacobian matrix.
+  dt (float): The time step for the evolution.
+
+Returns:
+  torch.Tensor: The concentration differences
+  )doc",
+        py::arg("rate"), py::arg("stoich"), py::arg("jacobian"), py::arg("dt"));
 }
