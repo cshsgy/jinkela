@@ -10,8 +10,8 @@
 
 // kintera
 #include <kintera/constants.h>
+#include <kintera/math/core.h>
 #include <kintera/math/leastsq_kkt.h>
-#include <kintera/math/mmdot.h>
 
 #include <kintera/utils/func1.hpp>
 #include <kintera/utils/func2.hpp>
@@ -37,6 +37,7 @@ namespace kintera {
  *                              nreaction.
  * \param[in] nspecies          number of species in the system.
  * \param[in] nreaction         number of reactions in the system.
+ * \param[in] ngas              number of gas species in the system.
  * \param[in] intEng_offset     offset for internal energy calculations.
  * \param[in] cv_const          const component of heat capacity.
  * \param[in] logsvp_func       user-defined functions for logarithm of
@@ -57,22 +58,25 @@ namespace kintera {
 template <typename T>
 DISPATCH_MACRO int equilibrate_uv(
     T *gain, T *diag, T *temp, T *conc, T h0, T const *stoich, int nspecies,
-    int nreaction, T const *intEng_offset, T const *cv_const,
+    int nreaction, int ngas, T const *intEng_offset, T const *cv_const,
     user_func1 const *logsvp_func, user_func1 const *logsvp_func_ddT,
     user_func2 const *intEng_R_extra, user_func2 const *cv_R_extra,
     float logsvp_eps, int *max_iter, int *reaction_set, int *nactive,
     char *work = nullptr) {
   // check positive temperature
   if (*temp <= 0) {
-    printf("Error: Non-positive temperature.\n");
+    printf("Error: Non-positive temperature = %g.\n", *temp);
     return 1;  // error: non-positive temperature
   }
 
   // check non-negative concentration
   for (int i = 0; i < nspecies; i++) {
     if (conc[i] < 0) {
-      printf("Error: Negative concentration for species %d.\n", i);
-      return 1;  // error: negative concentration
+      printf("Warning: Negative concentration for species %d = %g.\n", i,
+             conc[i]);
+      printf("Setting it to zero.\n");
+      conc[i] = 0.;
+      // return 1;  // error: negative concentration
     }
   }
 
@@ -91,7 +95,7 @@ DISPATCH_MACRO int equilibrate_uv(
   }
 
   T *intEng, *intEng_ddT, *logsvp, *logsvp_ddT, *weight, *rhs;
-  T *stoich_active;
+  T *stoich_active, *conc0;
   T *gain_cpy;
 
   if (work == nullptr) {
@@ -109,6 +113,9 @@ DISPATCH_MACRO int equilibrate_uv(
     // active stoichiometric matrix
     stoich_active = (T *)malloc(nspecies * nreaction * sizeof(T));
 
+    // concentration copy
+    conc0 = (T *)malloc(nspecies * sizeof(T));
+
     // gain matrix copy
     gain_cpy = (T *)malloc(nreaction * nreaction * sizeof(T));
   } else {
@@ -119,6 +126,7 @@ DISPATCH_MACRO int equilibrate_uv(
     weight = alloc_from<T>(work, nreaction * nspecies);
     rhs = alloc_from<T>(work, nreaction);
     stoich_active = alloc_from<T>(work, nspecies * nreaction);
+    conc0 = alloc_from<T>(work, nspecies);
     gain_cpy = alloc_from<T>(work, nreaction * nreaction);
   }
 
@@ -140,6 +148,14 @@ DISPATCH_MACRO int equilibrate_uv(
   int iter = 0;
   int err_code = 0;
   while (iter++ < *max_iter) {
+    /*printf("iteration %d: T = %g\n", iter, *temp);
+    // print conc
+    printf("concentrations: ");
+    for (int i = 0; i < nspecies; i++) {
+      printf("%g ", conc[i]);
+    }
+    printf("\n");*/
+
     // evaluate log vapor saturation pressure and its derivative
     for (int j = 0; j < nreaction; j++) {
       T stoich_sum = 0.0;
@@ -168,8 +184,12 @@ DISPATCH_MACRO int equilibrate_uv(
 
       // active set condition variables
       for (int i = 0; i < nspecies; i++) {
-        if ((stoich[i * nreaction + j] < 0) && (conc[i] > 0.)) {  // reactant
-          log_conc_sum += (-stoich[i * nreaction + j]) * log(conc[i]);
+        if (stoich[i * nreaction + j] < 0) {  // reactant
+          if (conc[i] == 0.) {
+            log_conc_sum = -99;  // force to be in active set
+          } else {
+            log_conc_sum += (-stoich[i * nreaction + j]) * log(conc[i]);
+          }
         } else if (stoich[i * nreaction + j] > 0) {  // product
           prod *= conc[i];
         }
@@ -181,9 +201,13 @@ DISPATCH_MACRO int equilibrate_uv(
         for (int i = 0; i < nspecies; i++) {
           weight[first * nspecies + i] =
               logsvp_ddT[j] * intEng[i] / heat_capacity;
-          if ((stoich[i * nreaction + j] < 0) && (conc[i] > 0.)) {
-            weight[first * nspecies + i] +=
-                (-stoich[i * nreaction + j]) / conc[i];
+          if (stoich[i * nreaction + j] < 0) {
+            if (conc[i] == 0.) {
+              weight[first * nspecies + i] += 1.e5;
+            } else {
+              weight[first * nspecies + i] +=
+                  (-stoich[i * nreaction + j]) / conc[i];
+            }
           }
         }
         rhs[first] = logsvp[j] - log_conc_sum;
@@ -224,10 +248,21 @@ DISPATCH_MACRO int equilibrate_uv(
     if (err_code != 0) break;
 
     // rate -> conc
-    for (int i = 0; i < nspecies; i++) {
-      for (int k = 0; k < (*nactive); k++) {
-        conc[i] -= stoich_active[i * (*nactive) + k] * rhs[k];
+    memcpy(conc0, conc, nspecies * sizeof(T));
+    T lambda = 1.;  // scale
+    while (true) {
+      bool good = true;
+      for (int i = 0; i < nspecies; i++) {
+        for (int k = 0; k < (*nactive); k++) {
+          conc[i] -= stoich_active[i * (*nactive) + k] * rhs[k] * lambda;
+        }
+        if ((i < ngas) && (conc0[i] > 0.) &&
+            ((conc[i] / conc0[i] > 100.) || (conc[i] / conc0[i] < 0.01)))
+          good = false;
       }
+      if (good) break;
+      lambda *= 0.99;
+      memcpy(conc, conc0, nspecies * sizeof(T));
     }
 
     // temperature iteration

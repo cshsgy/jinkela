@@ -10,6 +10,7 @@
 // math
 #include "lubksb.h"
 #include "ludcmp.h"
+#include "psolve.h"
 
 #define A(i, j) a[(i) * n2 + (j)]
 #define ATA(i, j) ata[(i) * n2 + (j)]
@@ -17,6 +18,18 @@
 #define C(i, j) c[(i) * n2 + (j)]
 
 namespace kintera {
+
+// Compute bitmask hash for a set of integers [0..n-1]
+DISPATCH_MACRO uint64_t hash_set(const int *arr, int size, int n) {
+  uint64_t mask = 0;
+  for (int i = 0; i < size; i++) {
+    int x = arr[i];
+    if (x >= 0 && x < n) {
+      mask |= (1ULL << x);
+    }
+  }
+  return mask;
+}
 
 template <typename T>
 DISPATCH_MACRO void populate_aug(T *aug, T const *ata, T const *c, int n2,
@@ -110,12 +123,12 @@ DISPATCH_MACRO int leastsq_kkt(T *b, T const *a, T const *c, T const *d, int n1,
   // Allocate memory for the augmented matrix and right-hand side vector
   int size = n2 + n3;
   T *aug, *ata, *atb, *rhs, *eval;
-  int *ct_indx, *lu_indx;
+  int *ct_indx, *lu_indx, *skip_row;
 
   if (work == nullptr) {
     aug = (T *)malloc(size * size * sizeof(T));
     ata = (T *)malloc(n2 * n2 * sizeof(T));
-    atb = (T *)malloc(size * sizeof(T));
+    atb = (T *)malloc(n2 * sizeof(T));
     rhs = (T *)malloc(size * sizeof(T));
 
     // evaluation of constraints
@@ -126,14 +139,18 @@ DISPATCH_MACRO int leastsq_kkt(T *b, T const *a, T const *c, T const *d, int n1,
 
     // index array for the LU decomposition
     lu_indx = (int *)malloc(size * sizeof(int));
+
+    // row indices to skip
+    skip_row = (int *)malloc(size * sizeof(int));
   } else {
     aug = alloc_from<T>(work, size * size);
     ata = alloc_from<T>(work, n2 * n2);
-    atb = alloc_from<T>(work, size);
+    atb = alloc_from<T>(work, n2);
     rhs = alloc_from<T>(work, size);
     eval = alloc_from<T>(work, n3);
     ct_indx = alloc_from<int>(work, n3);
     lu_indx = alloc_from<int>(work, size);
+    skip_row = alloc_from<int>(work, size);
   }
 
   // populate A^T.A
@@ -176,16 +193,27 @@ DISPATCH_MACRO int leastsq_kkt(T *b, T const *a, T const *c, T const *d, int n1,
       printf("%d ", ct_indx[i]);
     }
     printf("\n");*/
-    int nactive0 = nactive;
+    uint64_t hash0 = hash_set(ct_indx, nactive, n3);
+
     populate_aug(aug, ata, c, n2, nactive, ct_indx);
     populate_rhs(rhs, atb, d, n2, nactive, ct_indx);
 
     // solve the KKT system
-    ludcmp(aug, lu_indx, n2 + nactive, work);
+    // determine the non-zero rows
+    for (int i = 0; i < n2 + nactive; ++i) {
+      bool all_zero = true;
+      for (int j = 0; j < n2 + nactive; ++j) {
+        if (aug[i * (n2 + nactive) + j] != 0.0) {
+          all_zero = false;
+          break;
+        }
+      }
+      skip_row[i] = all_zero;
+      if (all_zero) rhs[i] = 0.0;
+    }
 
-    for (int i = 0; i < n2 + nactive; ++i)
-      assert(lu_indx[i] >= 0 && lu_indx[i] < n2 + nactive);
-    lubksb(rhs, aug, lu_indx, n2 + nactive);
+    ludcmp(aug, lu_indx, n2 + nactive, work, skip_row);
+    lubksb(rhs, aug, lu_indx, n2 + nactive, skip_row);
 
     // evaluate the inactive constraints
     for (int i = nactive; i < n3; ++i) {
@@ -274,10 +302,9 @@ DISPATCH_MACRO int leastsq_kkt(T *b, T const *a, T const *c, T const *d, int n1,
     }
 
     nactive = first;
-    if (nactive == nactive0) {
-      // no change in active set, we are done
-      break;
-    }
+    uint64_t hash1 = hash_set(ct_indx, nactive, n3);
+    // no change in active set, we are done
+    if (hash0 == hash1) break;
   }
 
   // copy to output vector b

@@ -10,8 +10,8 @@
 #include <configure.h>
 
 // kintera
+#include <kintera/math/core.h>
 #include <kintera/math/leastsq_kkt.h>
-#include <kintera/math/mmdot.h>
 
 #include <kintera/utils/func1.hpp>
 
@@ -29,6 +29,7 @@ namespace kintera {
  * \param[in] temp              equilibrium temperature in Kelvin.
  * \param[in] pres              equilibrium pressure in Pascals.
  * \param[in] nspecies          number of species in the system.
+ * \param[in] nreaction         number of reactions in the system.
  * \param[in] ngas              number of gas species in the system.
  * \param[in] logsvp_func       user-defined function for logarithm of
  * saturation vapor pressure with respect to temperature.
@@ -87,11 +88,9 @@ DISPATCH_MACRO int equilibrate_tp(T *gain, T *diag, T *xfrac, T temp, T pres,
 
     // weight matrix
     weight = (T *)malloc(nreaction * nspecies * sizeof(T));
-    memset(weight, 0, nreaction * nspecies * sizeof(T));
 
     // right-hand-side vector
     rhs = (T *)malloc(nreaction * sizeof(T));
-    memset(rhs, 0, nreaction * sizeof(T));
 
     // active stoichiometric matrix
     stoich_active = (T *)malloc(nspecies * nreaction * sizeof(T));
@@ -109,11 +108,9 @@ DISPATCH_MACRO int equilibrate_tp(T *gain, T *diag, T *xfrac, T temp, T pres,
 
     // weight matrix
     weight = alloc_from<T>(work, nreaction * nspecies);
-    memset(weight, 0, nreaction * nspecies * sizeof(T));
 
     // right-hand-side vector
     rhs = alloc_from<T>(work, nreaction);
-    memset(rhs, 0, nreaction * sizeof(T));
 
     // active stoichiometric matrix
     stoich_active = alloc_from<T>(work, nspecies * nreaction);
@@ -127,6 +124,9 @@ DISPATCH_MACRO int equilibrate_tp(T *gain, T *diag, T *xfrac, T temp, T pres,
     // gain matrix copy
     gain_cpy = alloc_from<T>(work, nreaction * nreaction);
   }
+
+  memset(weight, 0, nreaction * nspecies * sizeof(T));
+  memset(rhs, 0, nreaction * sizeof(T));
 
   // evaluate log vapor saturation pressure and its derivative
   for (int j = 0; j < nreaction; j++) {
@@ -252,7 +252,7 @@ DISPATCH_MACRO int equilibrate_tp(T *gain, T *diag, T *xfrac, T temp, T pres,
     for (int i = 0; i < nspecies; i++) xfrac[i] /= xsum;
   }
 
-  /////////// Construct a gain matrix of active reactions ///////////
+  /*///////// Construct a gain matrix of active reactions ///////////
   int first = 0;
   int last = nreaction;
   T xg = 0.0;
@@ -302,6 +302,8 @@ DISPATCH_MACRO int equilibrate_tp(T *gain, T *diag, T *xfrac, T temp, T pres,
     }
 
   mmdot(gain_cpy, weight, stoich_active, *nactive, nspecies, *nactive);
+  */
+  memcpy(gain_cpy, gain, nreaction * nreaction * sizeof(T));
   memset(gain, 0, nreaction * nreaction * sizeof(T));
 
   for (int k = 0; k < (*nactive); k++) {

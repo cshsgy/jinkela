@@ -34,7 +34,8 @@ namespace kintera {
  * internally
  */
 template <typename T>
-DISPATCH_MACRO int ludcmp(T *x, int *indx, int n, char *work = nullptr) {
+DISPATCH_MACRO int ludcmp(T *x, int *indx, int n, char *work = nullptr,
+                          int *skip_row = nullptr) {
   int i, imax, j, k, d;
   T big, dum, sum, temp;
   T *vv;
@@ -51,17 +52,19 @@ DISPATCH_MACRO int ludcmp(T *x, int *indx, int n, char *work = nullptr) {
 
   d = 1;
   for (i = 0; i < n; i++) {
+    if (skip_row && skip_row[i]) continue;
     big = 0.0;
     for (j = 0; j < n; j++)
       if ((temp = fabs(X(i, j))) > big) big = temp;
     if (big == 0.0) {
       // printf("Singular matrix in routine ludcmp\n");
       if (work == nullptr) free(vv);
-      return 1;
+      return 0;
     }
     vv[i] = 1.0 / big;
   }
   for (j = 0; j < n; j++) {
+    if (skip_row && skip_row[j]) continue;
     for (i = 0; i < j; i++) {
       sum = X(i, j);
       for (k = 0; k < i; k++) sum -= X(i, k) * X(k, j);
@@ -94,7 +97,6 @@ DISPATCH_MACRO int ludcmp(T *x, int *indx, int n, char *work = nullptr) {
     }
   }
   if (work == nullptr) free(vv);
-
   return d;
 }
 
