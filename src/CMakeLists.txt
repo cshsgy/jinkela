@@ -57,7 +57,6 @@ target_link_libraries(${namel}_${buildl}
     ${C10_LIBRARY}
     ${HARP_LIBRARY}
     ${DISORT_LIBRARY}
-    $<IF:$<BOOL:${CUDAToolkit_FOUND}>,,kintera::vapors>
     )
 
 add_library(kintera::kintera ALIAS ${namel}_${buildl})
@@ -83,10 +82,8 @@ if (CUDAToolkit_FOUND)
   target_link_libraries(${namel}_cuda_${buildl}
       PUBLIC
       CUDA::cudart
-      CUDA::cudart_static
       ${TORCH_CUDA_LIBRARY}
       ${C10_CUDA_LIBRARY}
-      kintera::vapors
       )
 
   add_library(kintera::kintera_cu ALIAS ${namel}_cuda_${buildl})
@@ -95,5 +92,3 @@ endif()
 set(KINTERA_INCLUDE_DIR
   "${CMAKE_CURRENT_SOURCE_DIR}/.."
   CACHE INTERNAL "kintera include directory")
-
-add_subdirectory(vapors)

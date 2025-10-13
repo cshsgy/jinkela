@@ -5,16 +5,21 @@
 #include <c10/cuda/CUDAGuard.h>
 
 // kintera
-#include <kintera/utils/func1.hpp>
+#include <kintera/utils/user_funcs.hpp>
 #include <kintera/loops.cuh>
 #include "utils_dispatch.hpp"
 
 namespace kintera {
 
-void call_func1_cuda(at::TensorIterator &iter, std::vector<std::string> const& funcs) {
+extern std::vector<std::string> func1_names;
+extern std::vector<std::string> func2_names;
+extern std::vector<std::string> func3_names;
+
+void call_func1_cuda(at::TensorIterator &iter,
+                     std::vector<std::string> const& funcs) {
   at::cuda::CUDAGuard device_guard(iter.device());
 
-  auto f1 = get_device_func1(funcs);
+  auto f1 = get_device_func1(funcs, func1_names);
   auto f1_ptrs = f1.data().get();
 
   AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "call_func1_cuda", [&] {
@@ -34,10 +39,11 @@ void call_func1_cuda(at::TensorIterator &iter, std::vector<std::string> const& f
   });
 }
 
-void call_func2_cuda(at::TensorIterator &iter, std::vector<std::string> const& funcs) {
+void call_func2_cuda(at::TensorIterator &iter,
+                     std::vector<std::string> const& funcs) {
   at::cuda::CUDAGuard device_guard(iter.device());
 
-  auto f2 = get_device_func2(funcs);
+  auto f2 = get_device_func2(funcs, func2_names);
   auto f2_ptrs = f2.data().get();
 
   AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "call_func2_cuda", [&] {
@@ -61,7 +67,7 @@ void call_func2_cuda(at::TensorIterator &iter, std::vector<std::string> const& f
 void call_func3_cuda(at::TensorIterator &iter, std::vector<std::string> const& funcs) {
   at::cuda::CUDAGuard device_guard(iter.device());
 
-  auto f3 = get_device_func3(funcs);
+  auto f3 = get_device_func3(funcs, func3_names);
   auto f3_ptrs = f3.data().get();
 
   AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "call_func3_cuda", [&] {
@@ -87,6 +93,10 @@ void call_func3_cuda(at::TensorIterator &iter, std::vector<std::string> const& f
 }  // namespace kintera
 
 namespace at::native {
+
+DEFINE_DISPATCH(call_func1);
+DEFINE_DISPATCH(call_func2);
+DEFINE_DISPATCH(call_func3);
 
 REGISTER_CUDA_DISPATCH(call_func1, &kintera::call_func1_cuda);
 REGISTER_CUDA_DISPATCH(call_func2, &kintera::call_func2_cuda);
