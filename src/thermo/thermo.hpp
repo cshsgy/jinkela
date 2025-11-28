@@ -36,15 +36,21 @@ inline std::vector<T> insert_first(T value, std::vector<T> const& input) {
   return result;
 }
 
-struct ThermoOptions : public SpeciesThermo {
+struct ThermoOptionsImpl final : public SpeciesThermoImpl {
+  static std::shared_ptr<ThermoOptionsImpl> create() {
+    return std::make_shared<ThermoOptionsImpl>();
+  }
+
   //! \brief Create a `ThermoOptions` object from a YAML file
   /*!
    * This function reads a YAML file and creates a `ThermoOptions`
    * object from it.
    */
-  static ThermoOptions from_yaml(std::string const& filename);
-  static ThermoOptions from_yaml(YAML::Node const& config);
-  ThermoOptions() = default;
+  static std::shared_ptr<ThermoOptionsImpl> from_yaml(
+      std::string const& filename, bool verbose = false);
+  static std::shared_ptr<ThermoOptionsImpl> from_yaml(YAML::Node const& config,
+                                                      bool verbose = false);
+
   void report(std::ostream& os) const {
     os << "* Tref = " << Tref() << " K\n"
        << "* Pref = " << Pref() << " Pa\n"
@@ -62,7 +68,9 @@ struct ThermoOptions : public SpeciesThermo {
   ADD_ARG(int, max_iter) = 10;
   ADD_ARG(double, ftol) = 1e-6;
   ADD_ARG(double, gas_floor) = 1.e-20;
+  ADD_ARG(bool, verbose) = false;
 };
+using ThermoOptions = std::shared_ptr<ThermoOptionsImpl>;
 
 //! Mass Thermodynamics
 class ThermoYImpl : public torch::nn::Cloneable<ThermoYImpl> {
@@ -85,9 +93,9 @@ class ThermoYImpl : public torch::nn::Cloneable<ThermoYImpl> {
   //! options with which this `ThermoY` was constructed
   ThermoOptions options;
 
-  ThermoYImpl() = default;
+  ThermoYImpl() : options(ThermoOptionsImpl::create()) {}
   explicit ThermoYImpl(const ThermoOptions& options_);
-  ThermoYImpl(const ThermoOptions& options1_, const SpeciesThermo& options2);
+  ThermoYImpl(const ThermoOptions& options1, const SpeciesThermo& options2);
   void reset() override;
   void pretty_print(std::ostream& os) const override;
 
@@ -220,9 +228,9 @@ class ThermoXImpl : public torch::nn::Cloneable<ThermoXImpl> {
   //! options with which this `ThermoX` was constructed
   ThermoOptions options;
 
-  ThermoXImpl() = default;
+  ThermoXImpl() : options(ThermoOptionsImpl::create()) {}
   explicit ThermoXImpl(const ThermoOptions& options_);
-  ThermoXImpl(const ThermoOptions& options1_, const SpeciesThermo& options2_);
+  ThermoXImpl(const ThermoOptions& options1, const SpeciesThermo& options2);
   void reset() override;
   void pretty_print(std::ostream& os) const override;
 
