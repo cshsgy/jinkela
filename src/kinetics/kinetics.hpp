@@ -21,7 +21,11 @@ namespace kintera {
 
 struct KineticsOptionsImpl final : public SpeciesThermoImpl {
   static std::shared_ptr<KineticsOptionsImpl> create() {
-    return std::make_shared<KineticsOptionsImpl>();
+    auto op = std::make_shared<KineticsOptionsImpl>();
+    op->arrhenius() = ArrheniusOptionsImpl::create();
+    op->coagulation() = CoagulationOptionsImpl::create();
+    op->evaporation() = EvaporationOptionsImpl::create();
+    return op;
   }
 
   static std::shared_ptr<KineticsOptionsImpl> from_yaml(
@@ -50,6 +54,19 @@ using KineticsOptions = std::shared_ptr<KineticsOptionsImpl>;
 
 class KineticsImpl : public torch::nn::Cloneable<KineticsImpl> {
  public:
+  //! Create and register a `KineticsImpl` module
+  /*!
+   * This function registers the created module as a submodule
+   * of the given parent module `p`.
+   *
+   * \param[in] opts  options for constructing the `KineticsImpl`
+   * \param[in] p     parent module for registering the created module
+   * \return          created `KineticsImpl` module
+   */
+  static std::shared_ptr<KineticsImpl> create(
+      KineticsOptions const& opts, torch::nn::Module* p,
+      std::string const& name = "kinetics");
+
   //! stoichiometry matrix, shape (nspecies, nreaction)
   torch::Tensor stoich;
 
