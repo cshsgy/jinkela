@@ -56,6 +56,7 @@ struct ThermoOptionsImpl final : public SpeciesThermoImpl {
                                                       bool verbose = false);
 
   void report(std::ostream& os) const {
+    os << "-- thermodynamics options --\n";
     os << "* Tref = " << Tref() << " K\n"
        << "* Pref = " << Pref() << " Pa\n"
        << "* max_iter = " << max_iter() << "\n"
@@ -84,13 +85,19 @@ struct ExtrapOptions {
   // Logarithmic change in pressure (dlnp = ln(p_new / p_old))
   ADD_ARG(double, dlnp) = 0.;
   ADD_ARG(double, dz) = 0.;
+
   // Gravitational acceleration (m/s^2), positive
   ADD_ARG(double, grav) = 0;
   ADD_ARG(double, ds_dlnp) = 0;
+
   // Height change (m)
   ADD_ARG(double, ds_dz) = 0;
+
   // If true, print debug information
   ADD_ARG(bool, verbose) = false;
+
+  // Drop condensates
+  ADD_ARG(bool, rainout) = false;
 };
 
 //! Mass Thermodynamics
