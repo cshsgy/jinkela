@@ -25,3 +25,5 @@ dist
 # test outputs
 examples/*.png
 examples/*.pdf
+
+.vscode
