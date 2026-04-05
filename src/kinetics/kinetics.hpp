@@ -43,6 +43,11 @@ struct KineticsOptionsImpl final : public SpeciesThermoImpl {
   static std::shared_ptr<KineticsOptionsImpl> from_yaml(
       YAML::Node const& config, bool verbose = false);
 
+  static std::shared_ptr<KineticsOptionsImpl> from_kinetics_base(
+      std::string const& master_input_path,
+      std::string const& photo_catalog_path = "",
+      std::string const& cross_dir = "", bool verbose = false);
+
   void report(std::ostream& os) const {
     os << "-- kinetics options --\n";
     os << "* Tref = " << Tref() << " K\n"
