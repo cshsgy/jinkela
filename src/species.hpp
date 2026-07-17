@@ -38,9 +38,10 @@ void ensure_species_initialized(YAML::Node const& config);
 at::Tensor nasa9_gibbs_rt(at::Tensor temp,
                           std::vector<std::string> const& species);
 
-//! Fetch NASA-9 coefficients from the bundled database BY NAME, independent of the species
-//! registry. Returns (2, nsp, 9) = [low|high][species][coeff]. Used by the H2<->2H dissociation
-//! thermo, whose H/H2/He are internal to the model and need not be registry species.
+//! Fetch NASA-9 coefficients from the bundled database BY NAME, independent of
+//! the species registry. Returns (2, nsp, 9) = [low|high][species][coeff]. Used
+//! by the H2<->2H dissociation thermo, whose H/H2/He are internal to the model
+//! and need not be registry species.
 at::Tensor nasa9_coeffs_by_name(std::vector<std::string> const& species,
                                 at::TensorOptions const& options);
 
@@ -98,26 +99,32 @@ struct SpeciesThermoImpl {
   //! NASA-9 range mid-point temperature [K], one value per species.
   ADD_ARG(std::vector<double>, nasa9_Tmid);
 
-  //! Opt-in: use NASA-9 polynomials for cp/cv/internal-energy of species that carry NASA-9 data
-  //! (gives T-dependent cv, e.g. H2 rotational/vibrational). Default false -> constant-cref_R baseline
-  //! (bit-identical to before). NOTE: only affects cp/cv/intEng (not entropy); intended for dry H2/He
-  //! runs. Do NOT enable together with condensation of a NASA-9 vapor (entropy left on cref_R baseline).
+  //! Opt-in: use NASA-9 polynomials for cp/cv/internal-energy of species that
+  //! carry NASA-9 data (gives T-dependent cv, e.g. H2 rotational/vibrational).
+  //! Default false -> constant-cref_R baseline (bit-identical to before). NOTE:
+  //! only affects cp/cv/intEng (not entropy); intended for dry H2/He runs. Do
+  //! NOT enable together with condensation of a NASA-9 vapor (entropy left on
+  //! cref_R baseline).
   ADD_ARG(bool, use_nasa9_cp) = false;
 
-  //! Opt-in: first-principles rotational partition-function cp/cv/internal-energy for an explicit
-  //! species named "H2" (theta_rot = 87.55 K). Captures H2 rotational freezing below ~150 K and, in
-  //! "equilibrium" mode, the ortho<->para conversion peak near 50 K that NASA-9 (a 200-1000 K combustion
-  //! fit) cannot represent. Parameter-free; overrides NASA-9 for the H2 species. Default false.
+  //! Opt-in: first-principles rotational partition-function
+  //! cp/cv/internal-energy for an explicit species named "H2" (theta_rot
+  //! = 87.55 K). Captures H2 rotational freezing below ~150 K and, in
+  //! "equilibrium" mode, the ortho<->para conversion peak near 50 K that NASA-9
+  //! (a 200-1000 K combustion fit) cannot represent. Parameter-free; overrides
+  //! NASA-9 for the H2 species. Default false.
   ADD_ARG(bool, use_h2_cp) = false;
-  //! H2 ortho-para mode: "equilibrium" (ortho<->para equilibrates -> conversion peak; default) or
-  //! "normal" (fixed 3:1 para:ortho, no peak).
+  //! H2 ortho-para mode: "equilibrium" (ortho<->para equilibrates -> conversion
+  //! peak; default) or "normal" (fixed 3:1 para:ortho, no peak).
   ADD_ARG(std::string, h2_cp_mode) = "equilibrium";
 
-  //! Opt-in: fold H2 <-> 2H equilibrium into ONE lumped H/He species (no advected H).
-  //! Supplies cz (particle count), internal energy and cv/cp from one closed-form speciation,
-  //! so grad_ad emerges correctly. See thermo/h2_dissociation.hpp.
+  //! Opt-in: fold H2 <-> 2H equilibrium into ONE lumped H/He species (no
+  //! advected H). Supplies cz (particle count), internal energy and cv/cp from
+  //! one closed-form speciation, so grad_ad emerges correctly. See
+  //! thermo/h2_dissociation.hpp.
   ADD_ARG(bool, use_h2_dissociation) = false;
-  //! index of the lumped H/He species, and its H / He atoms per mole (from its `composition`)
+  //! index of the lumped H/He species, and its H / He atoms per mole (from its
+  //! `composition`)
   ADD_ARG(int, h2_diss_id) = 0;
   ADD_ARG(double, h2_diss_nH) = 0.;
   ADD_ARG(double, h2_diss_nHe) = 0.;
