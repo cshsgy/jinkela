@@ -62,12 +62,6 @@ target_link_libraries(${namel}_${buildl}
     ${DISORT_LIBRARY}
     )
 
-if(CUDAToolkit_FOUND)
-  # thermo_y.cpp reports a device failure count without syncing the host.
-  target_compile_definitions(${namel}_${buildl} PRIVATE KINTERA_HAS_CUDA)
-  target_link_libraries(${namel}_${buildl} PRIVATE CUDA::cudart)
-endif()
-
 add_library(kintera::kintera ALIAS ${namel}_${buildl})
 
 # CUDA source codes

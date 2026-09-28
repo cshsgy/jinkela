@@ -1,3 +1,6 @@
+// C++
+#include <unordered_map>
+
 // kintera
 #include <kintera/constants.h>
 
@@ -10,10 +13,7 @@
 #include "thermo_dispatch.hpp"
 #include "thermo_formatter.hpp"
 
-#ifdef KINTERA_HAS_CUDA
-#include <c10/cuda/CUDAStream.h>
-#include <cuda_runtime.h>
-#endif
+
 
 namespace kintera {
 
@@ -258,6 +258,13 @@ torch::Tensor ThermoYImpl::compute(std::string ab,
   }
 }
 
+namespace {
+std::unordered_map<ThermoYImpl*, torch::Tensor>& failure_counts() {
+  static thread_local std::unordered_map<ThermoYImpl*, torch::Tensor> slots;
+  return slots;
+}
+}  // namespace
+
 torch::Tensor ThermoYImpl::forward(torch::Tensor rho, torch::Tensor intEng,
                                    torch::Tensor const& yfrac, bool warm_start,
                                    torch::optional<torch::Tensor> diag) {
@@ -331,46 +338,14 @@ torch::Tensor ThermoYImpl::forward(torch::Tensor rho, torch::Tensor intEng,
       options->intEng_R_extra(), options->ftol(), options->max_iter(),
       uv_solver);
 
-  // Count unadjusted cells. On CUDA the count stays on the device and is
-  // read in a host callback on the current stream, so forward itself does
-  // not sync. The callback runs at the next sync the caller already does.
-  auto nfail_t = (diag.value() < 0).sum();
-  if (nfail_t.is_cpu()) {
-    auto nfail = nfail_t.item<int64_t>();
-    if (nfail > 0) {
-      TORCH_WARN("ThermoYImpl::forward: saturation adjustment failed in ",
-                 nfail, " cell(s); diag = -(100 * status + iterations)");
-    }
-  } else {
-#ifdef KINTERA_HAS_CUDA
-    auto nfail_i = nfail_t.to(torch::kLong);
-    int64_t* host = nullptr;
-    auto stream = c10::cuda::getCurrentCUDAStream().stream();
-    TORCH_CHECK(cudaMallocHost(&host, sizeof(int64_t)) == cudaSuccess,
-                "ThermoYImpl::forward: pinned count allocation failed");
-    TORCH_CHECK(cudaMemcpyAsync(host, nfail_i.data_ptr<int64_t>(),
-                                sizeof(int64_t), cudaMemcpyDeviceToHost,
-                                stream) == cudaSuccess,
-                "ThermoYImpl::forward: async failure-count copy failed");
-    TORCH_CHECK(cudaLaunchHostFunc(
-                    stream,
-                    [](void* p) {
-                      auto* n = static_cast<int64_t*>(p);
-                      if (*n > 0) {
-                        TORCH_WARN(
-                            "ThermoYImpl::forward: saturation adjustment "
-                            "failed in ",
-                            *n,
-                            " cell(s); diag = -(100 * status + iterations)");
-                      }
-                      cudaFreeHost(n);
-                    },
-                    host) == cudaSuccess,
-                "ThermoYImpl::forward: failure-count callback failed");
-#else
-    TORCH_CHECK(false, "ThermoYImpl::forward: CUDA tensor without CUDA");
-#endif
+  // Keep the failure count on the same device as the cells. The caller
+  // reads it with take_saturation_adjustment_failures(); forward does not sync.
+  auto nfail_t = (diag.value() < 0).sum().to(torch::kLong);
+  auto& slot = failure_counts()[this];
+  if (!slot.defined() || slot.device() != nfail_t.device()) {
+    slot = torch::zeros({}, nfail_t.options());
   }
+  slot += nfail_t;
 
   ivol = conc / inv_mu;
   yfrac.copy_(compute("V->Y", {ivol}));
@@ -378,6 +353,14 @@ torch::Tensor ThermoYImpl::forward(torch::Tensor rho, torch::Tensor intEng,
   vec[ivol.dim() - 1] = reactions.size();
   vec.push_back(reactions.size());
   return gain.view(vec);
+}
+
+int64_t ThermoYImpl::take_saturation_adjustment_failures() {
+  auto it = failure_counts().find(this);
+  if (it == failure_counts().end() || !it->second.defined()) return 0;
+  auto n = it->second.item<int64_t>();
+  it->second.zero_();
+  return n;
 }
 
 void ThermoYImpl::_ivol_to_yfrac(torch::Tensor ivol, torch::Tensor& out) const {
