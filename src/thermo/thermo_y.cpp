@@ -1,6 +1,3 @@
-// C++
-#include <unordered_map>
-
 // kintera
 #include <kintera/constants.h>
 
@@ -12,8 +9,6 @@
 #include "thermo.hpp"
 #include "thermo_dispatch.hpp"
 #include "thermo_formatter.hpp"
-
-
 
 namespace kintera {
 
@@ -258,13 +253,6 @@ torch::Tensor ThermoYImpl::compute(std::string ab,
   }
 }
 
-namespace {
-std::unordered_map<ThermoYImpl*, torch::Tensor>& failure_counts() {
-  static thread_local std::unordered_map<ThermoYImpl*, torch::Tensor> slots;
-  return slots;
-}
-}  // namespace
-
 torch::Tensor ThermoYImpl::forward(torch::Tensor rho, torch::Tensor intEng,
                                    torch::Tensor const& yfrac, bool warm_start,
                                    torch::optional<torch::Tensor> diag) {
@@ -338,14 +326,21 @@ torch::Tensor ThermoYImpl::forward(torch::Tensor rho, torch::Tensor intEng,
       options->intEng_R_extra(), options->ftol(), options->max_iter(),
       uv_solver);
 
-  // Keep the failure count on the same device as the cells. The caller
-  // reads it with take_saturation_adjustment_failures(); forward does not sync.
+  // Keep the failure count on the same device as the cells. forward does
+  // not sync. On CPU the count is already on the host, so warn here. On
+  // CUDA the caller reads it with take_saturation_adjustment_failures().
   auto nfail_t = (diag.value() < 0).sum().to(torch::kLong);
-  auto& slot = failure_counts()[this];
-  if (!slot.defined() || slot.device() != nfail_t.device()) {
-    slot = torch::zeros({}, nfail_t.options());
+  if (!nfail_.defined() || nfail_.device() != nfail_t.device()) {
+    nfail_ = torch::zeros({}, nfail_t.options());
   }
-  slot += nfail_t;
+  nfail_ += nfail_t;
+  if (nfail_t.is_cpu()) {
+    auto nfail = nfail_t.item<int64_t>();
+    if (nfail > 0) {
+      TORCH_WARN("ThermoYImpl::forward: saturation adjustment failed in ",
+                 nfail, " cell(s); diag = -(100 * status + iterations)");
+    }
+  }
 
   ivol = conc / inv_mu;
   yfrac.copy_(compute("V->Y", {ivol}));
@@ -356,10 +351,9 @@ torch::Tensor ThermoYImpl::forward(torch::Tensor rho, torch::Tensor intEng,
 }
 
 int64_t ThermoYImpl::take_saturation_adjustment_failures() {
-  auto it = failure_counts().find(this);
-  if (it == failure_counts().end() || !it->second.defined()) return 0;
-  auto n = it->second.item<int64_t>();
-  it->second.zero_();
+  if (!nfail_.defined()) return 0;
+  auto n = nfail_.item<int64_t>();
+  nfail_.zero_();
   return n;
 }
 

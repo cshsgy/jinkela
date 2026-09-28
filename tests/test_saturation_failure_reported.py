@@ -31,7 +31,7 @@ DEVICES = ["cpu"] + (["cuda"] if torch.cuda.is_available() else [])
 
 
 @pytest.mark.parametrize("device", DEVICES)
-def test_unadjusted_cell_is_reported(tmp_path, device):
+def test_unadjusted_cell_is_reported(tmp_path, capfd, device):
     (path := tmp_path / "nh4sh.yaml").write_text(CARD)
     th = ThermoY(ThermoOptions.from_yaml(str(path)))
     th.to(torch.device(device))
@@ -45,8 +45,15 @@ def test_unadjusted_cell_is_reported(tmp_path, device):
     assert th.take_saturation_adjustment_failures() == 1
     assert th.take_saturation_adjustment_failures() == 0
 
-    # no diag, as a dynamical core calls it. The count stays on device until take().
+    # no diag, as a dynamical core calls it. CPU warns inside the call.
+    # CUDA keeps the count on the device until take().
+    capfd.readouterr()
     th.forward(rho, intEng, yfrac.clone(), False)
+    err = capfd.readouterr().err
+    if device == "cpu":
+        assert "saturation adjustment failed" in err
+    else:
+        assert "saturation adjustment failed" not in err
     assert th.take_saturation_adjustment_failures() == 1, (
         f"{device}: an unadjusted cell was not reported"
     )

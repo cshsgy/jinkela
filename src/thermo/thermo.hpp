@@ -138,6 +138,10 @@ class ThermoYImpl : public torch::nn::Cloneable<ThermoYImpl> {
   //! kkt warm start active set
   torch::Tensor reaction_set, nactive;
 
+  //! cells whose saturation adjustment failed since the last take.
+  //! A plain tensor, not a registered buffer, so state_dict is unchanged.
+  torch::Tensor nfail_;
+
   //! options with which this `ThermoY` was constructed
   ThermoOptions options;
   bool uv_partitionable = false;
