@@ -749,6 +749,17 @@ class ThermoY:
         """
         ...
 
+    def take_saturation_adjustment_failures(self) -> int:
+        """
+        Read and reset the number of cells whose saturation adjustment
+        failed since the previous call. On CUDA this copies one integer
+        to the host. On CPU, forward already warned.
+
+        Returns:
+            int: Failure count since the previous take
+        """
+        ...
+
     def compute(self, ab: str, args: List[torch.Tensor]) -> torch.Tensor:
         """
         Compute thermodynamic transformations.

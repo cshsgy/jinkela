@@ -150,6 +150,9 @@ void ThermoYImpl::reset() {
     std::cout << "[ThermoY] stoichiometry matrix: " << std::endl;
     std::cout << stoich << std::endl;
   }
+
+  // clone() calls reset(); drop any count copied from the original.
+  nfail_ = torch::Tensor();
 }
 
 void ThermoYImpl::pretty_print(std::ostream& os) const {
@@ -326,11 +329,23 @@ torch::Tensor ThermoYImpl::forward(torch::Tensor rho, torch::Tensor intEng,
       options->intEng_R_extra(), options->ftol(), options->max_iter(),
       uv_solver);
 
-  // counted on CPU only: on GPU diag is written but a count would force a sync
-  int64_t nfail = conc.is_cpu() ? (diag.value() < 0).sum().item<int64_t>() : 0;
-  if (nfail > 0) {
-    TORCH_WARN("ThermoYImpl::forward: saturation adjustment failed in ", nfail,
-               " cell(s); diag = -(100 * status + iterations)");
+  // Keep the failure count on the same device as the cells. forward does
+  // not sync. On CPU the count is already on the host, so warn here. On
+  // CUDA the caller reads it with take_saturation_adjustment_failures().
+  // Out of place: nfail_ += would throw after a forward under inference_mode.
+  // A later forward on another device replaces nfail_; the move itself does
+  // not.
+  auto nfail_t = (diag.value() < 0).sum().to(torch::kLong);
+  if (!nfail_.defined() || nfail_.device() != nfail_t.device()) {
+    nfail_ = torch::zeros({}, nfail_t.options());
+  }
+  nfail_ = nfail_ + nfail_t;
+  if (nfail_t.is_cpu()) {
+    auto nfail = nfail_t.item<int64_t>();
+    if (nfail > 0) {
+      TORCH_WARN("ThermoYImpl::forward: saturation adjustment failed in ",
+                 nfail, " cell(s); diag = -(100 * status + iterations)");
+    }
   }
 
   ivol = conc / inv_mu;
@@ -339,6 +354,13 @@ torch::Tensor ThermoYImpl::forward(torch::Tensor rho, torch::Tensor intEng,
   vec[ivol.dim() - 1] = reactions.size();
   vec.push_back(reactions.size());
   return gain.view(vec);
+}
+
+int64_t ThermoYImpl::take_saturation_adjustment_failures() {
+  if (!nfail_.defined()) return 0;
+  auto n = nfail_.item<int64_t>();
+  nfail_ = torch::Tensor();
+  return n;
 }
 
 void ThermoYImpl::_ivol_to_yfrac(torch::Tensor ivol, torch::Tensor& out) const {

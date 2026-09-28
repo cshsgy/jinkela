@@ -63,7 +63,9 @@ void bind_thermo(py::module& m) {
                      py::arg("diag") = py::none())
 
       .def("compute", &kintera::ThermoYImpl::compute, py::arg("ab"),
-           py::arg("args"));
+           py::arg("args"))
+      .def("take_saturation_adjustment_failures",
+           &kintera::ThermoYImpl::take_saturation_adjustment_failures);
 
   ADD_KINTERA_MODULE(ThermoX, ThermoOptions, &kintera::ThermoXImpl::forward,
                      py::arg("temp"), py::arg("pres"), py::arg("xfrac"),

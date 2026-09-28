@@ -138,6 +138,10 @@ class ThermoYImpl : public torch::nn::Cloneable<ThermoYImpl> {
   //! kkt warm start active set
   torch::Tensor reaction_set, nactive;
 
+  //! cells whose saturation adjustment failed since the last take.
+  //! A plain tensor, not a registered buffer, so state_dict is unchanged.
+  torch::Tensor nfail_;
+
   //! options with which this `ThermoY` was constructed
   ThermoOptions options;
   bool uv_partitionable = false;
@@ -150,6 +154,10 @@ class ThermoYImpl : public torch::nn::Cloneable<ThermoYImpl> {
 
   //! \brief perform conversions
   torch::Tensor compute(std::string ab, std::vector<torch::Tensor> const& args);
+
+  //! Read and reset the number of cells whose saturation adjustment failed
+  //! since the previous take. On CUDA this copies one integer to the host.
+  int64_t take_saturation_adjustment_failures();
 
   //! \brief Perform saturation adjustment
   /*!
