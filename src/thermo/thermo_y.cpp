@@ -150,6 +150,9 @@ void ThermoYImpl::reset() {
     std::cout << "[ThermoY] stoichiometry matrix: " << std::endl;
     std::cout << stoich << std::endl;
   }
+
+  // clone() calls reset(); drop any count copied from the original.
+  nfail_ = torch::Tensor();
 }
 
 void ThermoYImpl::pretty_print(std::ostream& os) const {
@@ -329,11 +332,13 @@ torch::Tensor ThermoYImpl::forward(torch::Tensor rho, torch::Tensor intEng,
   // Keep the failure count on the same device as the cells. forward does
   // not sync. On CPU the count is already on the host, so warn here. On
   // CUDA the caller reads it with take_saturation_adjustment_failures().
+  // Out of place: nfail_ += would throw after a forward under inference_mode.
+  // Moving the module to another device before take() drops this count.
   auto nfail_t = (diag.value() < 0).sum().to(torch::kLong);
   if (!nfail_.defined() || nfail_.device() != nfail_t.device()) {
     nfail_ = torch::zeros({}, nfail_t.options());
   }
-  nfail_ += nfail_t;
+  nfail_ = nfail_ + nfail_t;
   if (nfail_t.is_cpu()) {
     auto nfail = nfail_t.item<int64_t>();
     if (nfail > 0) {
@@ -353,7 +358,7 @@ torch::Tensor ThermoYImpl::forward(torch::Tensor rho, torch::Tensor intEng,
 int64_t ThermoYImpl::take_saturation_adjustment_failures() {
   if (!nfail_.defined()) return 0;
   auto n = nfail_.item<int64_t>();
-  nfail_.zero_();
+  nfail_ = torch::Tensor();
   return n;
 }
 

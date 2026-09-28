@@ -30,6 +30,18 @@ CELL = (208.72174072916363, 0.8801790168247441, 5.279766354738258e-04, 1.4283110
 DEVICES = ["cpu"] + (["cuda"] if torch.cuda.is_available() else [])
 
 
+def _thermo(tmp_path):
+    (path := tmp_path / "nh4sh.yaml").write_text(CARD)
+    return ThermoY(ThermoOptions.from_yaml(str(path)))
+
+
+def _state(th, device):
+    temp, rho, *y = torch.tensor([CELL], device=device).t()
+    yfrac = torch.stack(y)
+    intEng = th.compute("VT->U", [th.compute("DY->V", [rho, yfrac]), temp])
+    return rho, intEng, yfrac
+
+
 @pytest.mark.parametrize("device", DEVICES)
 def test_unadjusted_cell_is_reported(tmp_path, capfd, device):
     (path := tmp_path / "nh4sh.yaml").write_text(CARD)
@@ -58,3 +70,26 @@ def test_unadjusted_cell_is_reported(tmp_path, capfd, device):
         f"{device}: an unadjusted cell was not reported"
     )
     assert th.take_saturation_adjustment_failures() == 0
+
+
+@pytest.mark.parametrize("device", DEVICES)
+def test_inference_mode_does_not_poison_later_forwards(tmp_path, device):
+    th = _thermo(tmp_path)
+    th.to(torch.device(device))
+    rho, intEng, yfrac = _state(th, device)
+    with torch.inference_mode():
+        th.forward(rho, intEng, yfrac.clone(), False)
+    th.forward(rho, intEng, yfrac.clone(), False)
+    assert th.take_saturation_adjustment_failures() == 2
+
+
+@pytest.mark.parametrize("device", DEVICES)
+def test_clone_does_not_share_the_failure_count(tmp_path, device):
+    th = _thermo(tmp_path)
+    th.to(torch.device(device))
+    rho, intEng, yfrac = _state(th, device)
+    cloned = th.clone()
+    th.forward(rho, intEng, yfrac.clone(), False)
+    cloned.forward(rho, intEng, yfrac.clone(), False)
+    assert th.take_saturation_adjustment_failures() == 1
+    assert cloned.take_saturation_adjustment_failures() == 1
