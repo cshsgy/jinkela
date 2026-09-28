@@ -73,4 +73,14 @@ include-package-data = false
 ]
 
 [tool.setuptools_scm]
-fallback_version = "0.0.0"
+# Versions come from git tags. A tree without git metadata is handled in order:
+# - a `git archive` (release tarballs) carries its `git describe` in
+#   .git_archival.txt and gets its exact version;
+# - an archive without a describe (git older than 2.32, or no reachable tag)
+#   and a plain copied tree report fallback_version, the release floor below.
+# scm_version_scheme.py applies the floor on the archive path too, which
+# setuptools_scm alone would report as 0.0 (#125).
+# fallback_version is the newest release reachable when this line was last
+# updated; tests/test_version_floor.py checks it is never ahead of the tags.
+fallback_version = "2.5.10"
+version_scheme = "scm_version_scheme:floored_guess_next_dev"
