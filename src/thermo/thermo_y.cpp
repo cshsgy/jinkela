@@ -333,7 +333,8 @@ torch::Tensor ThermoYImpl::forward(torch::Tensor rho, torch::Tensor intEng,
   // not sync. On CPU the count is already on the host, so warn here. On
   // CUDA the caller reads it with take_saturation_adjustment_failures().
   // Out of place: nfail_ += would throw after a forward under inference_mode.
-  // Moving the module to another device before take() drops this count.
+  // A later forward on another device replaces nfail_; the move itself does
+  // not.
   auto nfail_t = (diag.value() < 0).sum().to(torch::kLong);
   if (!nfail_.defined() || nfail_.device() != nfail_t.device()) {
     nfail_ = torch::zeros({}, nfail_t.options());

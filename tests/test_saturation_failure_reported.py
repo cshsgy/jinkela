@@ -88,8 +88,11 @@ def test_clone_does_not_share_the_failure_count(tmp_path, device):
     th = _thermo(tmp_path)
     th.to(torch.device(device))
     rho, intEng, yfrac = _state(th, device)
+    th.forward(rho, intEng, yfrac.clone(), False)
     cloned = th.clone()
     th.forward(rho, intEng, yfrac.clone(), False)
     cloned.forward(rho, intEng, yfrac.clone(), False)
-    assert th.take_saturation_adjustment_failures() == 1
+    # The pre-clone failure stays with the original. Each post-clone failure
+    # stays with the module that ran it.
+    assert th.take_saturation_adjustment_failures() == 2
     assert cloned.take_saturation_adjustment_failures() == 1
