@@ -1,5 +1,4 @@
 #include <gtest/gtest.h>
-
 #include <kintera/thermo/equilibrate_tp.h>
 
 #include <cmath>
@@ -40,7 +39,7 @@ Call solve(int cap) {
   return out;
 }
 
-} // namespace
+}  // namespace
 
 // A solve that first succeeds with the cap above the iteration it needs must
 // also succeed when the cap is exactly that iteration. Today the
@@ -53,8 +52,7 @@ TEST(equilibrate_tp, converges_on_its_last_allowed_iteration) {
   auto exact = solve(wide.iter);
   EXPECT_EQ(exact.rc, 0);
   EXPECT_EQ(exact.iter, wide.iter);
-  for (int i = 0; i < 3; ++i)
-    EXPECT_DOUBLE_EQ(exact.x[i], wide.x[i]);
+  for (int i = 0; i < 3; ++i) EXPECT_DOUBLE_EQ(exact.x[i], wide.x[i]);
 }
 
 // One iteration does not reach that equilibrium, so the failure code stays.
