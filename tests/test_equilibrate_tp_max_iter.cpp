@@ -42,8 +42,8 @@ Call solve(int cap) {
 }  // namespace
 
 // A solve that first succeeds with the cap above the iteration it needs must
-// also succeed when the cap is exactly that iteration. Today the
-// `iter >= max_iter` test flags it.
+// also succeed when the cap is exactly that iteration. Meeting the tolerance
+// on that pass is success, even though iter has reached the cap.
 TEST(equilibrate_tp, converges_on_its_last_allowed_iteration) {
   auto wide = solve(20);
   ASSERT_EQ(wide.rc, 0);
